@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Administrators read conversations and the tool-call log; nobody edits them -->
+    <record id="view_ai_tool_call_list" model="ir.ui.view">
+        <field name="name">levelix.ai.tool.call.list</field>
+        <field name="model">levelix.ai.tool.call</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0">
+                <field name="create_date"/>
+                <field name="user_id"/>
+                <field name="name"/>
+                <field name="res_model" optional="show"/>
+                <field name="record_count"/>
+                <field name="result_size" optional="hide"/>
+                <field name="duration_ms" optional="show"/>
+                <field name="privacy"/>
+                <field name="is_error" widget="boolean"/>
+                <field name="error" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_tool_call_form" model="ir.ui.view">
+        <field name="name">levelix.ai.tool.call.form</field>
+        <field name="model">levelix.ai.tool.call</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="create_date"/>
+                            <field name="user_id"/>
+                            <field name="name"/>
+                            <field name="res_model"/>
+                        </group>
+                        <group>
+                            <field name="privacy"/>
+                            <field name="record_count"/>
+                            <field name="result_size"/>
+                            <field name="duration_ms"/>
+                            <field name="is_error"/>
+                            <field name="error"/>
+                        </group>
+                    </group>
+                    <field name="arguments" widget="ace" options="{'mode': 'json'}"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_ai_tool_call_search" model="ir.ui.view">
+        <field name="name">levelix.ai.tool.call.search</field>
+        <field name="model">levelix.ai.tool.call</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="res_model"/>
+                <filter name="errors" string="Failed" domain="[('is_error', '=', True)]"/>
+                <group>
+                    <filter name="by_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="by_tool" string="Tool" context="{'group_by': 'name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_ai_conversation_list" model="ir.ui.view">
+        <field name="name">levelix.ai.conversation.list</field>
+        <field name="model">levelix.ai.conversation</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0">
+                <field name="write_date"/>
+                <field name="user_id"/>
+                <field name="name"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_conversation_form" model="ir.ui.view">
+        <field name="name">levelix.ai.conversation.form</field>
+        <field name="model">levelix.ai.conversation</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <sheet>
+                    <group><field name="name"/><field name="user_id"/></group>
+                    <field name="message_ids">
+                        <list>
+                            <field name="create_date"/>
+                            <field name="role"/>
+                            <field name="text"/>
+                            <field name="state"/>
+                            <field name="provider" optional="show"/>
+                            <field name="model" optional="show"/>
+                            <field name="tokens_in" optional="show"/>
+                            <field name="tokens_out" optional="show"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_tool_call" model="ir.actions.act_window">
+        <field name="name">Tool Calls</field>
+        <field name="res_model">levelix.ai.tool.call</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_ai_tool_call_search"/>
+    </record>
+    <record id="action_ai_conversation" model="ir.actions.act_window">
+        <field name="name">Conversations</field>
+        <field name="res_model">levelix.ai.conversation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_ai_chat" model="ir.actions.client">
+        <field name="name">Levelix AI</field>
+        <field name="tag">levelix_ai_core.chat</field>
+    </record>
+
+    <menuitem id="menu_levelix_ai_root" name="Levelix AI" sequence="62" groups="levelix_ai_core.group_ai_user" action="action_ai_chat"
+              web_icon="levelix_ai_core,static/description/icon.png"/>
+    <menuitem id="menu_levelix_ai_chat" name="Chat" parent="menu_levelix_ai_root" sequence="10" action="action_ai_chat"/>
+    <menuitem id="menu_levelix_ai_conversations" name="Conversations" parent="menu_levelix_ai_root" sequence="20"
+              action="action_ai_conversation" groups="base.group_system"/>
+    <menuitem id="menu_levelix_ai_tool_calls" name="Tool Calls" parent="menu_levelix_ai_root" sequence="30"
+              action="action_ai_tool_call" groups="base.group_system"/>
+    <menuitem id="menu_levelix_ai_settings" name="Settings" parent="menu_levelix_ai_root" sequence="40"
+              action="action_levelix_ai_settings" groups="base.group_system"/>
+</odoo>

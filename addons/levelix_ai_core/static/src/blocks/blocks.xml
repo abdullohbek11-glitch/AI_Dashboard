@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_ai_core.TableBlock">
+        <div class="lxai-block">
+            <div class="lxai-block__head">
+                <strong t-esc="props.block.title"/>
+                <button t-if="props.block.spec and props.onOpen" class="lxai-link" t-on-click="() => props.onOpen(props.block.spec, props.block.title)">Open in Odoo</button>
+            </div>
+            <div class="lxai-table-wrap">
+                <table class="lxai-table">
+                    <thead><tr><th t-foreach="props.block.columns" t-as="column" t-key="column_index" t-esc="column.label"/></tr></thead>
+                    <tbody>
+                        <tr t-foreach="props.block.rows" t-as="row" t-key="row_index">
+                            <td t-foreach="row" t-as="cell" t-key="cell_index" t-att-class="{'lxai-num': isNumber(cell)}" t-esc="formatCell(cell)"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div t-if="props.block.total > props.block.rows.length" class="lxai-note">
+                Showing <t t-esc="props.block.rows.length"/> of <t t-esc="props.block.total"/>
+            </div>
+            <div t-foreach="props.block.warnings or []" t-as="warning" t-key="warning_index" class="lxai-note lxai-note--warn" t-esc="warning"/>
+        </div>
+    </t>
+
+    <t t-name="levelix_ai_core.KpiBlock">
+        <div class="lxai-block">
+            <div class="lxai-block__head">
+                <strong t-esc="props.block.title"/>
+                <button t-if="props.block.spec and props.onOpen" class="lxai-link" t-on-click="() => props.onOpen(props.block.spec, props.block.title)">Open in Odoo</button>
+            </div>
+            <div class="lxai-kpis">
+                <div t-foreach="props.block.items" t-as="item" t-key="item_index" class="lxai-kpi">
+                    <div class="lxai-kpi__value" t-esc="formatUnit(item.value, props.block.unit)"/>
+                    <div class="lxai-kpi__label" t-esc="item.label"/>
+                </div>
+            </div>
+            <div t-foreach="props.block.warnings or []" t-as="warning" t-key="warning_index" class="lxai-note lxai-note--warn" t-esc="warning"/>
+        </div>
+    </t>
+
+    <t t-name="levelix_ai_core.ChartBlock">
+        <div class="lxai-block">
+            <div class="lxai-block__head">
+                <strong t-esc="props.block.title"/>
+                <button t-if="props.block.spec and props.onOpen" class="lxai-link" t-on-click="() => props.onOpen(props.block.spec, props.block.title)">Open in Odoo</button>
+            </div>
+            <div class="lxai-chart"><canvas t-ref="canvas"/></div>
+        </div>
+    </t>
+
+    <t t-name="levelix_ai_core.ChoicesBlock">
+        <div class="lxai-block lxai-block--choices">
+            <div class="lxai-block__head"><strong t-esc="props.block.title"/></div>
+            <div class="lxai-choices">
+                <button t-foreach="props.block.options" t-as="option" t-key="option_index" class="lxai-btn" t-on-click="() => props.onChoose(option)" t-esc="option.label"/>
+            </div>
+        </div>
+    </t>
+</templates>

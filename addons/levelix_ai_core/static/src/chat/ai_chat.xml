@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_ai_core.AiChat">
+        <div class="lxai" t-att-class="{'lxai--sidebar': props.sidebar}">
+            <aside t-if="props.sidebar" class="lxai-side">
+                <button class="lxai-btn lxai-btn--primary" t-on-click="() => chat.newChat()">New chat</button>
+                <ul class="lxai-convs">
+                    <li t-foreach="state.conversations" t-as="conversation" t-key="conversation.id"
+                        t-att-class="{'lxai-conv--active': state.conversation and state.conversation.id === conversation.id}">
+                        <button class="lxai-conv" t-on-click="() => chat.openConversation(conversation.id)" t-esc="conversation.name"/>
+                        <button class="lxai-icon-btn" aria-label="Archive" title="Archive" t-on-click="() => chat.archive(conversation.id)">✕</button>
+                    </li>
+                </ul>
+            </aside>
+            <section class="lxai-main">
+                <header class="lxai-top">
+                    <h2>Levelix AI</h2>
+                    <span class="lxai-chip" t-att-title="privacyHelp" t-esc="privacyLabel"/>
+                </header>
+
+                <div t-if="!state.configured" class="lxai-empty" role="alert">
+                    <div class="lxai-empty__title">The assistant is not set up yet</div>
+                    <div>The AI provider has no API key. <t t-if="state.isAdmin">Add one in the settings.</t><t t-else="">Ask your administrator to add one.</t></div>
+                    <button t-if="state.isAdmin" class="lxai-btn lxai-btn--primary" t-on-click="() => chat.openSettings()">Open settings</button>
+                </div>
+
+                <div t-else="" class="lxai-scroll" t-ref="scroller">
+                    <div t-if="!state.messages.length" class="lxai-empty">
+                        <div class="lxai-empty__title">Ask about your business</div>
+                        <div>Answers come from your own data, with your own access rights.</div>
+                        <div class="lxai-suggest">
+                            <button t-foreach="state.suggestions" t-as="suggestion" t-key="suggestion_index" class="lxai-btn" t-on-click="() => this.suggest(suggestion)" t-esc="suggestion"/>
+                        </div>
+                    </div>
+                    <t t-foreach="state.messages" t-as="message" t-key="message.id">
+                        <div t-if="message.role === 'user'" class="lxai-msg lxai-msg--user" t-esc="message.text"/>
+                        <div t-else="" class="lxai-msg lxai-msg--assistant" t-att-data-state="message.state">
+                            <t t-foreach="message.blocks" t-as="block" t-key="block_index">
+                                <t t-set="Block" t-value="blockComponent(block)"/>
+                                <t t-if="Block"><t t-component="Block" block="block" onOpen="(spec, title) => chat.openSpec(spec, title)" onChoose="(option) => chat.choose(option)"/></t>
+                            </t>
+                            <div t-if="message.text" class="lxai-text" t-out="html(message.text)"/>
+                            <div t-if="message.state === 'streaming' and !message.text" class="lxai-status" t-esc="state.status or 'Thinking…'"/>
+                            <div t-if="message.state === 'error'" class="lxai-error" role="alert">
+                                <span t-esc="message.error"/>
+                                <button class="lxai-link" t-on-click="() => this.retry(message_index)">Try again</button>
+                            </div>
+                            <details t-if="message.explain and message.explain.length" class="lxai-explain">
+                                <summary>How I got this</summary>
+                                <ul>
+                                    <li t-foreach="message.explain" t-as="line" t-key="line_index">
+                                        <t t-esc="line.label"/><t t-if="line.measures and line.measures.length">: <t t-esc="line.measures.join(', ')"/></t>
+                                        <t t-if="line.grouped and line.grouped.length"> by <t t-esc="line.grouped.join(', ')"/></t>
+                                        <t t-if="line.filters and line.filters.length"> (<t t-esc="line.filters.join('; ')"/>)</t>
+                                    </li>
+                                </ul>
+                            </details>
+                        </div>
+                    </t>
+                </div>
+
+                <div t-if="state.error" class="lxai-error lxai-error--banner" role="alert" t-esc="state.error"/>
+                <div t-if="state.busy and state.messages.length" class="lxai-status lxai-status--bar" t-esc="state.status"/>
+
+                <form class="lxai-ask" t-on-submit.prevent="submit">
+                    <textarea t-ref="input" rows="1" t-model="ui.draft" t-on-keydown="onKeydown" placeholder="Ask a question…" aria-label="Your question"
+                              t-att-disabled="!state.configured or state.busy"/>
+                    <button class="lxai-btn lxai-btn--primary" type="submit" t-att-disabled="!canAsk">Send</button>
+                </form>
+            </section>
+        </div>
+    </t>
+</templates>

@@ -496,6 +496,20 @@ Amalga oshirishda (`addons/levelix_board`) quyidagilar qo'shildi yoki aniqlashti
 - **Himoyalangan maydonlar:** `version` ni qo'lda yozib bo'lmaydi (`AccessError`); `user_id` va `company_id` ni faqat `Board manager` o'zgartiradi (qiymat o'zgarmasa xato yo'q). Superuser muhiti (`env.su`) bundan mustasno.
 - **Tarix yozuvlari:** `levelix.board.version` ga oddiy foydalanuvchida ham, managerda ham `create` huquqi **yo'q**. Yozuvni serverning o'zi yaratadi (`board._record_version`), `author_id` = haqiqiy foydalanuvchi. Bu modulning **yagona `sudo()`** i va u biznes ma'lumotni o'qimaydi, faqat tarix qatorini yozadi (T11 qoidasining kelishilgan istisnosi).
 
+### 6.12. F4 da aniqlangan qo'shimcha qoidalar (`levelix_ai_core`)
+
+- **Kalit yozish-faqat.** Sozlamalar formasi saqlangan kalitni qaytarmaydi (`get_values` bo'sh qaytaradi, faqat "kalit saqlangan" belgisi), yozilgan kalit vaqtinchalik sozlamalar qatoridan ham tozalanadi. "Remove Saved Key" tugmasi bor.
+- **Provayder xatolari** (`ProviderError.kind`): `auth` (401/403), `rate_limit` (429), `server` (5xx), `request` (boshqa 4xx, noma'lum model), `network`, `stream`. Qayta urinish faqat tarmoq xatosida (2 marta), HTTP javobda hech qachon. Vendor xabaridagi kalit `***` bilan almashtiriladi.
+- **Vositalar:** `find_models`, `describe_model`, `search_records`, `aggregate`, `pick_record`, `ask_user`. `ask_user` va `pick_record` core'da (4.3 jadvali `ask_user` ni `ai_board` ga qo'ygan edi): foydalanuvchiga ekranda tanlov beradi, modelga faqat "kutmoqda" holati ketadi. Kengaytirish: `_tool_defs()` ga qo'shish + `_tool_<nom>` + kerak bo'lsa `_to_ai_<nom>`.
+- **`aggregate` cheklovlari tuzatildi:** `sum` faqat Odoo `aggregator="sum"` deb e'lon qilgan maydonga, guruhlash maydoni saqlanadigan va guruhlanadigan bo'lishi shart, 200 guruh, ≤2 guruh, ≤4 o'lchov; vaqtsiz sana butun mahalliy kun; ordinary modelda bir nechta valyuta bo'lsa ogohlantirish va birliksiz (hisobot modellari o'zi o'tkazadi). F5 da `ai_board` uni board ijrochisiga yo'naltiradi.
+- **Maxfiylik (`levelix_ai.privacy`):** `aggregates` standart. `schema` rejimida: `search_records` taklif etilmaydi va ishlamaydi; `aggregate` natijasi faqat shakl (guruhlar/ustunlar soni va nomlari); ro'yxatda bo'lmagan vosita natijasi yashiriladi (xavfsiz standart); kontekst qatorida foydalanuvchi va kompaniya nomi, eslatilgan yozuv nomi yo'q (faqat `model#id`); tanlov tugmasi bosilganda vendorga nom emas "I chose the record named in mentioned_records." ketadi. Foydalanuvchi o'zi yozgan matn o'zgartirilmaydi.
+- **Huquqlar:** guruh `Assistant user` (`group_ai_user`); sozlama "Assistant for all internal users" uni `base.group_user` ga qo'shadi. Foydalanuvchi suhbatni yaratadi/arxivlaydi, xabar va vosita jurnalini faqat o'qiydi; yozuvni server yozadi (`sudo`, bookkeeping). Administrator hammasini o'qiydi (audit). Boshqa foydalanuvchi suhbati ko'rinmaydi (yozuv qoidasi).
+- **`sudo()` ro'yxati (core):** sozlamani o'qish/yozish (`ir.config_parameter`), xabar yaratish va yozish, vosita jurnali. Biznes ma'lumotga hech qaerda.
+- **Limitlar:** `daily_limit` (savol, standart 200) va `daily_tokens` (standart 0 = cheksiz), foydalanuvchining mahalliy kuni bo'yicha.
+- **Dvigatel:** MAX_STEPS=8; vosita natijasi modelga ≤12 000 belgi; har vosita savepoint va 8 s `statement_timeout` ichida; har chaqiruv `levelix.ai.tool.call` ga (nomi, argumentlar, maxfiylik rejimi, hajm, xato, vaqt).
+- **Eski `levelix_ai` bilan birga o'rnatilmaydi** (bir xil model nomlari va `levelix_ai.` prefiksi). Almashtirish F9 da.
+- **Frontend:** `AiChat`, xizmat `levelix_ai.chat`, bloklar reyestri `levelix_ai_blocks`; matn xavfsiz markdown (avval escape, so'ng o'z teglar; havola va rasm yo'q).
+
 ---
 
 ## 7. Drill-down, tahrirlash, maslahatlar

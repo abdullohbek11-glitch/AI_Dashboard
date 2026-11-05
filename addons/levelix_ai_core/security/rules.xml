@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Companies never mix -->
+    <record id="rule_ai_conversation_company" model="ir.rule">
+        <field name="name">AI conversation: own companies only</field>
+        <field name="model_id" ref="model_levelix_ai_conversation"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_ai_message_company" model="ir.rule">
+        <field name="name">AI message: own companies only</field>
+        <field name="model_id" ref="model_levelix_ai_message"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_ai_tool_call_company" model="ir.rule">
+        <field name="name">AI tool call: own companies only</field>
+        <field name="model_id" ref="model_levelix_ai_tool_call"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- A user sees and keeps only his own conversations -->
+    <record id="rule_ai_conversation_own" model="ir.rule">
+        <field name="name">AI conversation: own</field>
+        <field name="model_id" ref="model_levelix_ai_conversation"/>
+        <field name="groups" eval="[(4, ref('group_ai_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_ai_message_own" model="ir.rule">
+        <field name="name">AI message: own</field>
+        <field name="model_id" ref="model_levelix_ai_message"/>
+        <field name="groups" eval="[(4, ref('group_ai_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_ai_tool_call_own" model="ir.rule">
+        <field name="name">AI tool call: own</field>
+        <field name="model_id" ref="model_levelix_ai_tool_call"/>
+        <field name="groups" eval="[(4, ref('group_ai_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+
+    <!-- An administrator may read everything, for the audit; the content stays read-only -->
+    <record id="rule_ai_conversation_audit" model="ir.rule">
+        <field name="name">AI conversation: administrators read all</field>
+        <field name="model_id" ref="model_levelix_ai_conversation"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_ai_message_audit" model="ir.rule">
+        <field name="name">AI message: administrators read all</field>
+        <field name="model_id" ref="model_levelix_ai_message"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="rule_ai_tool_call_audit" model="ir.rule">
+        <field name="name">AI tool call: administrators read all</field>
+        <field name="model_id" ref="model_levelix_ai_tool_call"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+</odoo>

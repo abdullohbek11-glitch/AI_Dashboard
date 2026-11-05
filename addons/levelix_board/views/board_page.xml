@@ -6,7 +6,8 @@
         <field name="tag">levelix_board.board_page</field>
     </record>
 
-    <menuitem id="menu_levelix_board_root" name="Levelix Boards" sequence="60" groups="base.group_user" action="action_board_page"/>
+    <menuitem id="menu_levelix_board_root" name="Levelix Boards" sequence="60" groups="base.group_user" action="action_board_page"
+              web_icon="levelix_board,static/description/icon.png"/>
     <menuitem id="menu_levelix_board_open" name="Dashboards" parent="menu_levelix_board_root" sequence="10" action="action_board_page"/>
     <menuitem id="menu_levelix_board_manage" name="Manage" parent="menu_levelix_board_root" sequence="20" action="action_levelix_board"/>
 </odoo>

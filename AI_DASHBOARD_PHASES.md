@@ -44,7 +44,7 @@ Qoidalar:
 | F1 | Spec va so'rov ijrochisi (faqat backend) | L | 🟦 qabul kutilmoqda (`notes/F1_natijalar.md`) |
 | F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | 🟦 qabul kutilmoqda (`notes/F2_natijalar.md`) |
 | F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | 🟦 qabul kutilmoqda (`notes/F3_natijalar.md`) |
-| F4 | `levelix_ai_core`: AI poydevori va chat | L | ⬜ |
+| F4 | `levelix_ai_core`: AI poydevori va chat | L | 🟦 qabul kutilmoqda (`notes/F4_natijalar.md`; haqiqiy kalit bilan sinovlar `DEFERRED.md` da) |
 | F5 | `levelix_ai_board`: chatdan dashboard | L | ⬜ |
 | F6 | Qolgan grafik turlari, filtrlar, taqqoslash | L | ⬜ |
 | F7 | Tahrirlash, versiyalar, ulashish | M | ⬜ |
@@ -279,16 +279,23 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Ishlar
 
-- [ ] `levelix_ai` dan tanlab ko'chirish (T1.1 jadvali): `providers`, vositalar sikli, suhbat va jurnal modellari. Ovoz va `propose_change` ko'chirilmaydi.
-- [ ] Provayder interfeysi `stream(system, messages, tools)`; uch amalga oshirish; timeout, tarmoq xatosida qayta urinish, tushunarli xato matnlari (T4.1).
-- [ ] Vositalar reyestri: `_tool_defs()` / `_run()` `_inherit` orqali kengayadi (T4.2).
-- [ ] Umumiy vositalar: `find_models` (hisobot modellari birinchi), `describe_model`, `search_records`, `aggregate`. Cheklovlari (T1.1 oxiri) yangi ijrochi bilan tuzatiladi.
-- [ ] Maxfiylik rejimlari `aggregates` / `schema`: har vositada `to_ai(result, mode)` (T4.5).
-- [ ] Modellar: `levelix.ai.conversation`, `levelix.ai.message`, `levelix.ai.tool.call` (T3.2). Kalit va maxfiy maydonlar jurnalga yozilmaydi.
-- [ ] Sozlamalar sahifasi: provayder, kalit, model, timeout, maxfiylik, kunlik limit, **"Ulanishni tekshirish"** tugmasi. Faqat `base.group_system`.
-- [ ] Tizim prompti bo'laklardan yig'iladi (core qoidalari + modul bo'laklari) (T4.6).
-- [ ] Foydalanuvchi bo'yicha kunlik limit (T4.7).
-- [ ] `AiChat` komponenti: oqim bilan javob (`bus`), blok turlari reyestri `levelix_ai_blocks` (T8.5).
+- [x] `levelix_ai` dan tanlab ko'chirish (T1.1 jadvali): `providers`, vositalar sikli, suhbat va jurnal modellari. Ovoz va `propose_change` ko'chirilmaydi.
+- [x] Provayder interfeysi `stream(system, messages, tools)`; uch amalga oshirish; timeout, tarmoq xatosida qayta urinish, tushunarli xato matnlari (T4.1).
+- [x] Vositalar reyestri: `_tool_defs()` / `_run()` `_inherit` orqali kengayadi (T4.2).
+- [x] Umumiy vositalar: `find_models` (hisobot modellari birinchi), `describe_model`, `search_records`, `aggregate`. Cheklovlari (T1.1 oxiri) yangi ijrochi bilan tuzatiladi.
+- [x] Maxfiylik rejimlari `aggregates` / `schema`: har vositada `to_ai(result, mode)` (T4.5).
+- [x] Modellar: `levelix.ai.conversation`, `levelix.ai.message`, `levelix.ai.tool.call` (T3.2). Kalit va maxfiy maydonlar jurnalga yozilmaydi.
+- [x] Sozlamalar sahifasi: provayder, kalit, model, timeout, maxfiylik, kunlik limit, **"Ulanishni tekshirish"** tugmasi. Faqat `base.group_system`.
+- [x] Tizim prompti bo'laklardan yig'iladi (core qoidalari + modul bo'laklari) (T4.6).
+- [x] Foydalanuvchi bo'yicha kunlik limit (T4.7).
+- [x] `AiChat` komponenti: oqim bilan javob (`bus`), blok turlari reyestri `levelix_ai_blocks` (T8.5).
+
+### Natija (2026-11-05)
+
+- **[A]** Python 71 (`levelix_ai_core`) + 170 (`levelix_board`), JS 35. Soxta vendor uchala provayderning haqiqiy protokolida.
+- **[U]** `scripts/f4_ui_browser.py`: 21 tekshiruv, hammasi o'tdi (1–7 qadamlar uchala provayder uchun, soxta vendor bilan).
+- **Ochiq:** haqiqiy kalit bilan sinovlar (model to'g'ri vositani tanlaydimi): `DEFERRED.md`. Siz kalitni Sozlamalarga kiritasiz.
+- Batafsil: `notes/F4_natijalar.md`.
 
 ### Avtomatik test **[A]**
 
@@ -312,8 +319,8 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Tugadi, agar
 
-- **[A]** yashil; UI testi 1–7 o'tdi.
-- `levelix_ai_core` hech qayerda `levelix_board` ni import qilmaydi (bog'liqlik bir tomonga, T11).
+- **[A]** yashil ✅; UI testi 1–7 o'tdi ✅ (soxta vendor bilan; haqiqiy kalit bilan ⬜ `DEFERRED.md`).
+- `levelix_ai_core` hech qayerda `levelix_board` ni import qilmaydi (bog'liqlik bir tomonga, T11) ✅ (grep).
 
 ---
 

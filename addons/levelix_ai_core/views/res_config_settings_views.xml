@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_levelix_ai_core" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.levelix_ai_core</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Levelix AI" string="Levelix AI" name="levelix_ai_core" groups="base.group_system">
+                    <block title="Provider" name="lx_ai_provider_container">
+                        <setting id="lx_ai_provider_setting" string="AI Provider"
+                                 help="Answers are generated with your own API key. Data is sent to this provider only when a question needs it, and only what the privacy mode allows.">
+                            <field name="lx_ai_provider" widget="radio"/>
+                            <div class="mt-2" invisible="lx_ai_provider != 'anthropic'">
+                                <label for="lx_ai_anthropic_key" class="o_form_label"/>
+                                <field name="lx_ai_anthropic_key" password="True" placeholder="Paste a key to save or replace it"/>
+                                <div class="text-success" invisible="not lx_ai_anthropic_key_set">A key is saved. It is never shown again.</div>
+                                <label for="lx_ai_anthropic_model" class="o_form_label"/>
+                                <field name="lx_ai_anthropic_model"/>
+                                <label for="lx_ai_anthropic_base_url" class="o_form_label"/>
+                                <field name="lx_ai_anthropic_base_url" placeholder="https://api.anthropic.com"/>
+                            </div>
+                            <div class="mt-2" invisible="lx_ai_provider != 'openai'">
+                                <label for="lx_ai_openai_key" class="o_form_label"/>
+                                <field name="lx_ai_openai_key" password="True" placeholder="Paste a key to save or replace it"/>
+                                <div class="text-success" invisible="not lx_ai_openai_key_set">A key is saved. It is never shown again.</div>
+                                <label for="lx_ai_openai_model" class="o_form_label"/>
+                                <field name="lx_ai_openai_model"/>
+                                <label for="lx_ai_openai_base_url" class="o_form_label"/>
+                                <field name="lx_ai_openai_base_url" placeholder="https://api.openai.com/v1"/>
+                            </div>
+                            <div class="mt-2" invisible="lx_ai_provider != 'gemini'">
+                                <label for="lx_ai_gemini_key" class="o_form_label"/>
+                                <field name="lx_ai_gemini_key" password="True" placeholder="Paste a key to save or replace it"/>
+                                <div class="text-success" invisible="not lx_ai_gemini_key_set">A key is saved. It is never shown again.</div>
+                                <label for="lx_ai_gemini_model" class="o_form_label"/>
+                                <field name="lx_ai_gemini_model"/>
+                                <label for="lx_ai_gemini_base_url" class="o_form_label"/>
+                                <field name="lx_ai_gemini_base_url" placeholder="https://generativelanguage.googleapis.com/v1beta"/>
+                            </div>
+                            <button name="lx_ai_test_connection" type="object" string="Test Connection" class="btn-secondary mt-3"/>
+                            <button name="lx_ai_remove_key" type="object" string="Remove Saved Key" class="btn-link mt-3"/>
+                        </setting>
+                        <setting id="lx_ai_timeout_setting" string="Timeout and Temperature"
+                                 help="How long to wait for the provider, and how adventurous its answers are.">
+                            <label for="lx_ai_timeout" class="o_form_label"/>
+                            <field name="lx_ai_timeout"/>
+                            <label for="lx_ai_temperature" class="o_form_label"/>
+                            <field name="lx_ai_temperature" placeholder="Vendor default"/>
+                        </setting>
+                    </block>
+                    <block title="Privacy" name="lx_ai_privacy_container">
+                        <setting id="lx_ai_privacy_setting" string="Privacy Mode"
+                                 help="What the AI provider may see of your data. The user always sees the full result on screen.">
+                            <field name="lx_ai_privacy" widget="radio"/>
+                        </setting>
+                    </block>
+                    <block title="Governance" name="lx_ai_governance_container">
+                        <setting id="lx_ai_access_setting" string="Assistant for All Internal Users"
+                                 help="Off: pick who may use the assistant on each user's form, Access Rights &gt; Levelix AI.">
+                            <field name="group_lx_ai_user"/>
+                        </setting>
+                        <setting id="lx_ai_limit_setting" string="Daily Limits per User"
+                                 help="Each user stops at these numbers per day. 0 means no limit.">
+                            <label for="lx_ai_daily_limit" class="o_form_label"/>
+                            <field name="lx_ai_daily_limit"/>
+                            <label for="lx_ai_daily_tokens" class="o_form_label"/>
+                            <field name="lx_ai_daily_tokens"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_levelix_ai_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="context">{'module': 'levelix_ai_core'}</field>
+    </record>
+</odoo>

@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_conversation_user,levelix.ai.conversation user,model_levelix_ai_conversation,group_ai_user,1,1,1,1
+access_ai_conversation_admin,levelix.ai.conversation admin,model_levelix_ai_conversation,base.group_system,1,0,0,0
+access_ai_message_user,levelix.ai.message user,model_levelix_ai_message,group_ai_user,1,0,0,0
+access_ai_message_admin,levelix.ai.message admin,model_levelix_ai_message,base.group_system,1,0,0,0
+access_ai_tool_call_user,levelix.ai.tool.call user,model_levelix_ai_tool_call,group_ai_user,1,0,0,0
+access_ai_tool_call_admin,levelix.ai.tool.call admin,model_levelix_ai_tool_call,base.group_system,1,0,0,0

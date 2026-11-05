@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_ai_core.AiPage">
+        <div class="lxai-page"><AiChat sidebar="true"/></div>
+    </t>
+</templates>
