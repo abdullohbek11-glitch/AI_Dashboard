@@ -43,7 +43,7 @@ Qoidalar:
 | F0 | Tayyorgarlik va prototip tekshiruvi | S | ✅ yopildi 2026-11-05 (`notes/F0_natijalar.md`) |
 | F1 | Spec va so'rov ijrochisi (faqat backend) | L | 🟦 qabul kutilmoqda (`notes/F1_natijalar.md`) |
 | F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | 🟦 qabul kutilmoqda (`notes/F2_natijalar.md`) |
-| F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | ⬜ |
+| F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | 🟦 qabul kutilmoqda (`notes/F3_natijalar.md`) |
 | F4 | `levelix_ai_core`: AI poydevori va chat | L | ⬜ |
 | F5 | `levelix_ai_board`: chatdan dashboard | L | ⬜ |
 | F6 | Qolgan grafik turlari, filtrlar, taqqoslash | L | ⬜ |
@@ -216,24 +216,32 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Ishlar
 
-- [ ] Dizayn tizimi: `.lxb`, `--lxb-*` tokenlar (ranglar, shrift, bo'shliq, soya, burchak, harakat), yorug'/qorong'i rejim (T8.4).
-- [ ] `BoardPage`: to'liq ekranli client action, menyu, dashboard ro'yxati kartalari.
-- [ ] `core/`: `board_data` xizmati (`lx_load` → `lx_run`), `board_theme` xizmati.
-- [ ] `charts/`: `ChartAdapter` interfeysi, `ChartJsAdapter`, `EChartsAdapter` (lazy), registry (T8.3).
-- [ ] `widgets/`: vidjet reyestri + `kpi` (taqqoslash ▲▼), `area`/`line` (to'lqin), `bar`, `table` (jami qator) (T8.2).
-- [ ] Grid: 24 ustun, F0 dagi qaror bo'yicha (faqat joylashtirish; surish F7 da).
-- [ ] Holatlar: skeleton, bo'sh, xato (qayta urinish tugmasi), ruxsat yo'q. Bitta vidjet xatosi sahifani buzmaydi.
-- [ ] Ko'rinmaydigan vidjetlar `IntersectionObserver` bilan keyin yuklanadi (T2.2).
-- [ ] **Drill:** grafik nuqtasini bosish → yon panelda jadval (`side_table`), "Odoo'da ochish" tugmasi.
-- [ ] "Men nima qildim" komponenti (`explain/`), "Qanday hisoblangan" tugmasi.
-- [ ] Raqam formati `Intl.NumberFormat` (K / M / mlrd), valyuta `meta.currency` dan.
-- [ ] Mobil: grid bitta ustunga tushadi. Klaviatura bilan fokus.
+- [x] Dizayn tizimi: `.lxb`, `--lxb-*` tokenlar (ranglar, shrift, bo'shliq, soya, burchak, harakat), yorug'/qorong'i rejim (T8.4).
+- [x] `BoardPage`: to'liq ekranli client action, menyu, dashboard ro'yxati kartalari.
+- [x] `core/`: `board_data` xizmati (`lx_load` → `lx_run`), `board_theme` xizmati.
+- [x] `charts/`: `ChartAdapter` interfeysi, `ChartJsAdapter`, `EChartsAdapter` (lazy), registry (T8.3).
+- [x] `widgets/`: vidjet reyestri + `kpi`, `area`/`line` (to'lqin), `bar`, `table` (jami qator) (T8.2). KPI ning ▲▼ ko'rsatkichi yozilgan va birlik-test qilingan, lekin `compare` ma'lumoti F6 da keladi (hozir server `compare` ni rad etadi).
+- [x] Grid: 24 ustun, F0 dagi qaror bo'yicha (faqat joylashtirish; surish F7 da).
+- [x] Holatlar: skeleton, bo'sh, xato (qayta urinish tugmasi), ruxsat yo'q. Bitta vidjet xatosi sahifani buzmaydi.
+- [x] Ko'rinmaydigan vidjetlar `IntersectionObserver` bilan keyin yuklanadi (T2.2).
+- [x] **Drill:** grafik nuqtasini bosish → yon panelda jadval (`side_table`), "Odoo'da ochish" tugmasi.
+- [x] "Men nima qildim" komponenti (`explain/`), "Qanday hisoblangan" tugmasi.
+- [x] Raqam formati `Intl.NumberFormat` (K / M / mlrd), valyuta `meta.currency` dan.
+- [x] Mobil: grid bitta ustunga tushadi. Klaviatura bilan fokus.
 
 ### Avtomatik test
 
 - **[A]** F2 dagi barcha testlar yashil qoladi.
 - **[A]** JS birlik: adapter (frame → chart option), vidjet reyestri, grid hisobi.
 - **[T]** Tour: "to'lqinda kunni bosish → yon jadval ochiladi" (agar muhitda mumkin bo'lsa).
+
+### Natija (2026-11-05)
+
+- **[A]** Python 159 ta test yashil (`scripts/run_tests.sh`), JS birlik 28 ta yashil (`scripts/run_js_tests.sh`).
+- **[U]** 1–11 qadamlar haqiqiy brauzerda (headless Chrome), `scripts/f3_ui_browser.py`: 13 tekshiruv, hammasi o'tdi. Kutilgan raqamlar mustaqil SQL/ORM'dan. 12-qadam (dizayn) skrinshotlarni ko'rib baholandi.
+- Skrinshotlar repoga saqlanmadi (siz PNG'larni o'chirishni so'ragansiz); skript ularni vaqtinchalik papkaga yozadi.
+- **[T]** Odoo tour o'rniga Playwright ishlatildi (konteynerda Chrome yo'q).
+- Batafsil: `notes/F3_natijalar.md`.
 
 ### UI testi **[U]**
 
@@ -254,9 +262,9 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Tugadi, agar
 
-- UI testi 1–12 o'tdi (skrinshotlar `notes/F3_skrinshotlar/` ga).
-- **TZ 1-bosqich qabul mezoni:** to'lqin grafigida kunni bosganda o'sha kunning sale order'lari ochiladi.
-- 5.1 dagi spec bilan jami `sale.report` ga teng.
+- UI testi 1–12 o'tdi ✅ (skrinshotlar saqlanmaydi).
+- **TZ 1-bosqich qabul mezoni:** to'lqin grafigida kunni bosganda o'sha kunning sale order'lari ochiladi ✅ (2026-10-20: panelda 8 ta, ORM'da 8 ta).
+- 5.1 dagi spec bilan jami `sale.report` ga teng ✅.
 
 ---
 

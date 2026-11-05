@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.KpiWidget">
+        <div class="lxb-kpis" t-ref="root" t-on-click="onClick">
+            <div t-foreach="cards" t-as="card" t-key="card.id" class="lxb-kpi">
+                <div t-if="showLabel(card)" class="lxb-kpi__label" t-esc="card.label"/>
+                <div class="lxb-kpi__value" t-att-title="card.full" t-esc="card.text"/>
+                <div t-if="card.deltaText" t-attf-class="lxb-kpi__delta lxb-kpi__delta--{{card.delta.direction}}" t-esc="card.deltaText"/>
+                <div t-if="card.trend" class="lxb-kpi__trend" t-att-data-index="card_index"/>
+            </div>
+        </div>
+    </t>
+</templates>

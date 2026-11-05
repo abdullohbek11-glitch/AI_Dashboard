@@ -613,6 +613,18 @@ Vidjetlar faqat shu interfeysni biladi. ECharts faqat kerak bo'lganda yuklanadi 
 
 24 ustun, CSS grid. Surish va o'lcham o'zgartirish `pointer` hodisalari bilan o'z hook'imiz (`useGridDrag`). Agar murakkab bo'lib ketsa, GridStack (MIT) ga o'tiladi. Bu qaror 1-bosqich prototipida qabul qilinadi.
 
+### 8.7. F3 da aniqlangan qo'shimcha qoidalar
+
+- **Papkalar:** `static/src/{lib,core,charts,widgets,explain,drill,page,scss}`. `lib/` Odoo'ga bog'lanmagan toza JS (raqam formati, grid hisobi, frame → grafik sozlamalari, so'rovlarni birlashtirish) va `node --test` bilan sinaladi. Qolgani OWL.
+- **Kutubxonalar:** `line`/`area` — `view.smooth` bo'lsa ECharts, bo'lmasa Chart.js; `bar` va KPI trendi — Chart.js; `table` — oddiy DOM. ECharts `static/lib/echarts/echarts.min.js` (663 KB, `tools/echarts` da `npm run build` bilan yig'iladi) birinchi ishlatilganda yuklanadi.
+- **Jami qator:** `table` vidjetida server `meta.totals = {o'lchov_id: qiymat}` beradi (faqat `sum` va `count`; `having` bo'lsa yo'q). Frontend hech narsani o'zi hisoblamaydi. `limit` bo'lsa ham jami butun to'plamniki.
+- **"Boshqalar":** `group_refs` da `["__others__"]`; chizmada xira rangda, bosilmaydi.
+- **KPI:** o'lchovlar kartalar; sana o'qi bo'lsa oxirgi qator qiymat, barcha qatorlar kichik trend chizig'i. Taqqoslash (▲▼) `compare_rows` bo'lsa chiziladi (ma'lumot F6 da).
+- **Yuklash:** vidjet ekranga yaqinlashganda (`IntersectionObserver`, 200px) so'raydi; bir vaqtda so'ragan vidjetlar bitta `lx_run` ga birlashadi. Xato faqat o'sha kartada: `NO_ACCESS` (qayta urinishsiz), noma'lum tur, boshqa xatolar (qayta urinish bilan).
+- **Grid:** `grid` bor vidjet joyida; yo'qlari tepadan pastga, chapdan o'ngga joylashadi. Tor ekranda bitta ustun, tartib: y, keyin x. Joylashuv CSS o'zgaruvchilari (`--lxb-x/y/w/h/order`) orqali.
+- **Dizayn:** tokenlar `scss/board.scss` da, yorug'/qorong'i `data-theme` bilan (tanlov brauzerda saqlanadi). `libsass` `clamp()`/`min()`/`calc()` ni hisoblashga urinadi: ular `#{"..."}` ichida yoziladi.
+- **Menyu:** "Levelix Boards" → "Dashboards" (sahifa) va "Manage" (vaqtincha JSON muharriri). Odoo'ning o'z "Dashboards" ilovasi bilan chalkashmaslik uchun nom shunday.
+
 ---
 
 ## 9. Server API (RPC)

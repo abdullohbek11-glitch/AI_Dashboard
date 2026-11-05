@@ -17,6 +17,11 @@ class TestBoardRecord(BoardCase):
         self.assertEqual(board.version_ids.mapped("version"), [1])
         self.assertEqual(board.version_ids.origin, "manual")
 
+    def test_the_form_button_opens_the_dashboard_page(self):
+        board = self.make_board()
+        action = board.action_open_board()
+        self.assertEqual((action["type"], action["tag"], action["context"]), ("ir.actions.client", "levelix_board.board_page", {"board_id": board.id}))
+
     def test_a_new_spec_is_a_new_version_and_the_same_spec_is_not(self):
         board = self.make_board()
         board.spec = copy.deepcopy(board.spec)  # unchanged

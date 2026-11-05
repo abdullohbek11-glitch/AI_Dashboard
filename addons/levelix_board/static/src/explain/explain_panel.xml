@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.ExplainPanel">
+        <div class="lxb-explain" role="dialog" aria-label="How it was calculated">
+            <div class="lxb-explain__head">
+                <strong>How it was calculated</strong>
+                <button class="lxb-icon-btn" aria-label="Close" t-on-click="props.onClose">✕</button>
+            </div>
+            <ul class="lxb-explain__list">
+                <li t-foreach="important" t-as="line" t-key="line_index" t-attf-class="lxb-explain__line lxb-explain__line--{{line.kind}}" t-esc="line.text"/>
+            </ul>
+            <t t-if="details.length">
+                <button class="lxb-link" t-on-click="() => state.showDetails = !state.showDetails">
+                    <t t-if="state.showDetails">Hide details</t>
+                    <t t-else="">Details (<t t-esc="details.length"/>)</t>
+                </button>
+                <ul t-if="state.showDetails" class="lxb-explain__list lxb-explain__list--detail">
+                    <li t-foreach="details" t-as="line" t-key="line_index" class="lxb-explain__line" t-esc="line.text"/>
+                </ul>
+            </t>
+        </div>
+    </t>
+</templates>

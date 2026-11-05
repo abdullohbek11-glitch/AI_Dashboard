@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.BoardWidget">
+        <section class="lxb-card" t-ref="root" tabindex="0" t-att-style="props.style" t-att-aria-label="title" t-att-data-widget-id="props.widget.id" t-att-data-status="state.status">
+            <header class="lxb-card__head">
+                <h3 class="lxb-card__title" t-esc="title"/>
+                <button t-if="state.status === 'ready'" class="lxb-icon-btn" aria-label="How it was calculated" title="How it was calculated" t-on-click="toggleExplain">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="lxb-card__body">
+                <div t-if="state.status === 'idle' or state.status === 'loading'" class="lxb-skeleton" aria-busy="true"/>
+                <div t-elif="state.status === 'error'" class="lxb-state lxb-state--error" role="alert">
+                    <div class="lxb-state__title">
+                        <t t-if="noAccess">You do not have access to this data</t>
+                        <t t-else="">This widget could not be shown</t>
+                    </div>
+                    <div class="lxb-state__text" t-esc="state.error.message"/>
+                    <button t-if="canRetry" class="lxb-btn" t-on-click="load">Try again</button>
+                </div>
+                <div t-elif="isEmpty" class="lxb-state">
+                    <div class="lxb-state__title">No data for this period</div>
+                </div>
+                <t t-else="">
+                    <t t-component="definition.component" t-props="bodyProps"/>
+                </t>
+            </div>
+            <footer t-if="warnings.length" class="lxb-card__warn">
+                <span t-foreach="warnings" t-as="warning" t-key="warning_index" t-esc="warning.text" t-att-title="warning.code"/>
+            </footer>
+            <ExplainPanel t-if="state.explain" lines="state.explain" onClose="() => state.explain = null"/>
+        </section>
+    </t>
+</templates>

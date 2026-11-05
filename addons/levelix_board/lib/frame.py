@@ -56,6 +56,7 @@ class FrameBuilder:
 
         meta = {
             "count": len(rows),
+            "totals": self._totals(plan, total),
             "truncated": truncated,
             "currency": currency,
             "warnings": [w.to_dict() for w in warnings],
@@ -160,6 +161,18 @@ class FrameBuilder:
         merged.sort(key=lambda pair: pair[0][0], reverse=fill.direction == "desc")
         merged += undated
         return [r for r, _ in merged], [f for _, f in merged]
+
+    @staticmethod
+    def _totals(plan: Plan, total):
+        """``{measure id: grand total}`` for a table; only sums and counts can be totalled."""
+        if not plan.totals or total is None:
+            return None
+        out = {}
+        for measure in plan.measures:
+            if measure.additive:
+                value = total.get(measure.key) or 0
+                out[measure.id] = round(value) if measure.agg == "count" else value
+        return out
 
     # -- others -------------------------------------------------------------
 

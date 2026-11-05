@@ -187,3 +187,27 @@ class TestFrame(BaseCase):
         frame = build(p, [{"product_id": (1, "A"), "__count": 4}], total={"__count": 9})
         self.assertEqual(frame.rows[-1], [OTHERS, 5])
         self.assertIsInstance(frame.rows[-1][1], int)
+
+    def test_a_table_gets_grand_totals_of_additive_measures_only(self):
+        def table(data):
+            data["measures"] = [
+                {"id": "m1", "field": "price_subtotal", "agg": "sum"},
+                {"id": "m2", "field": "price_unit", "agg": "avg"},
+                {"id": "m3", "agg": "count"},
+            ]
+            data["dimensions"] = [{"field": "partner_id"}]
+            data.pop("fill_gaps", None)
+            data.pop("order", None)
+        raw = sample_spec()
+        raw["widgets"][0]["type"] = "table"
+        table(raw["widgets"][0]["data"])
+        p = Planner(fixtures.catalog()).plan(Spec.from_raw(raw).widgets[0], SALE_REPORT, TZ, NOW)
+        self.assertTrue(p.totals)
+        frame = build(p, [{"partner_id": (1, "A"), "price_subtotal:sum": 40.0, "price_unit:avg": 2.0, "__count": 2}],
+                      total={"price_subtotal:sum": 100.0, "price_unit:avg": 3.0, "__count": 5.0}).to_dict()
+        self.assertEqual(frame["meta"]["totals"], {"m1": 100.0, "m3": 5})  # no total of averages
+        self.assertEqual(len(frame["rows"]), 1)  # the total is not a row
+
+    def test_other_widgets_have_no_totals(self):
+        self.assertFalse(plan().totals)
+        self.assertIsNone(build(plan(), []).to_dict()["meta"]["totals"])

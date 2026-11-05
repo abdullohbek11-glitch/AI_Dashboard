@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.BoardPage">
+        <div class="lxb" t-att-data-theme="themeState.mode">
+            <header class="lxb-top">
+                <div class="lxb-top__left">
+                    <button t-if="state.view === 'board'" class="lxb-btn lxb-btn--ghost" t-on-click="showList">← All dashboards</button>
+                    <h1 class="lxb-title">
+                        <t t-if="state.view === 'board'" t-esc="state.board.spec.title or state.board.name"/>
+                        <t t-else="">Levelix Boards</t>
+                    </h1>
+                    <span t-if="state.view === 'board' and state.board.own_rights" class="lxb-chip" title="The numbers are calculated with your own access rights, so they can differ from the owner's.">Based on your access rights</span>
+                    <span t-if="state.view === 'board' and state.board.state === 'draft'" class="lxb-chip lxb-chip--muted">Draft</span>
+                </div>
+                <div class="lxb-top__right">
+                    <button t-if="state.view === 'board'" class="lxb-btn lxb-btn--ghost" t-on-click="refresh">Refresh</button>
+                    <button class="lxb-btn lxb-btn--ghost" t-on-click="() => this.theme.toggle()" t-att-aria-label="themeState.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+                        <t t-if="themeState.mode === 'dark'">☀ Light</t>
+                        <t t-else="">☾ Dark</t>
+                    </button>
+                </div>
+            </header>
+
+            <div t-if="state.error" class="lxb-state lxb-state--error lxb-page-state" role="alert">
+                <div class="lxb-state__title">Something went wrong</div>
+                <div class="lxb-state__text" t-esc="state.error"/>
+                <button class="lxb-btn" t-on-click="showList">Back to the list</button>
+            </div>
+
+            <t t-elif="state.view === 'list'">
+                <div t-if="state.loading" class="lxb-skeleton lxb-skeleton--page"/>
+                <div t-elif="!state.boards.length" class="lxb-state lxb-page-state">
+                    <div class="lxb-state__title">No dashboards yet</div>
+                    <div class="lxb-state__text">Create one under Manage and describe it as a spec.</div>
+                    <button class="lxb-btn lxb-btn--primary" t-on-click="manage">Manage dashboards</button>
+                </div>
+                <div t-else="" class="lxb-cards">
+                    <button t-foreach="state.boards" t-as="board" t-key="board.id" class="lxb-board-card" t-on-click="() => this.open(board.id)">
+                        <span class="lxb-board-card__name" t-esc="board.name"/>
+                        <span class="lxb-board-card__meta">
+                            <t t-esc="board.widgets"/> widgets · v<t t-esc="board.version"/>
+                        </span>
+                        <span class="lxb-board-card__meta" t-esc="board.owner"/>
+                        <span class="lxb-board-card__chips">
+                            <span t-if="!board.is_owner" class="lxb-chip">Shared with you</span>
+                            <span t-if="board.state === 'draft'" class="lxb-chip lxb-chip--muted">Draft</span>
+                        </span>
+                    </button>
+                </div>
+            </t>
+
+            <t t-else="">
+                <div t-if="!state.board.spec.widgets.length" class="lxb-state lxb-page-state">
+                    <div class="lxb-state__title">This dashboard has no widgets</div>
+                </div>
+                <div t-else="" class="lxb-grid">
+                    <BoardWidget t-foreach="cells" t-as="cell" t-key="cell.widget.id"
+                                 boardId="state.board.id" widget="cell.widget" reloadKey="state.reloadKey"
+                                 onDrill="(request) => this.openDrill(request)"
+                                 style="cell.style"/>
+                </div>
+            </t>
+
+            <DrillPanel t-if="state.drill" t-key="state.drill.key"
+                        boardId="state.board.id" request="state.drill" onClose="() => state.drill = null"/>
+        </div>
+    </t>
+</templates>

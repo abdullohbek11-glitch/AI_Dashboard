@@ -18,9 +18,12 @@ user, so every viewer sees only the data he may read. No AI is needed to use it.
         "security/ir.model.access.csv",
         "security/rules.xml",
         "views/board_views.xml",
+        "views/board_page.xml",
     ],
     "assets": {
-        "web.assets_backend": ["levelix_board/static/src/error_dialogs.js"],
+        "web.assets_backend": [
+            "levelix_board/static/src/**/*",
+        ],
     },
     "installable": True,
     "application": False,

@@ -1,0 +1,213 @@
+// Levelix Board design system. Everything hangs off `.lxb` and `--lxb-*` tokens; Odoo / Bootstrap
+// classes are not used, so an Odoo update cannot restyle the dashboards.
+
+.lxb {
+    // type, space, shape, motion
+    --lxb-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --lxb-radius: 16px;
+    --lxb-radius-sm: 10px;
+    --lxb-gap: 16px;
+    --lxb-pad: 20px;
+    --lxb-motion: 160ms;
+    --lxb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    // colour: light
+    --lxb-bg: #eef1f6;
+    --lxb-surface: #ffffff;
+    --lxb-surface-2: #f5f7fb;
+    --lxb-border: #dce2ec;
+    --lxb-text: #172033;
+    --lxb-text-muted: #596579;
+    --lxb-grid: #e5e9f0;
+    --lxb-accent: #2c4fd6;
+    --lxb-accent-text: #ffffff;
+    --lxb-good: #067647;
+    --lxb-bad: #b42318;
+    --lxb-warn: #8a5a00;
+    --lxb-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 6px 20px rgba(16, 24, 40, 0.06);
+    // colour-blind safe categories (Okabe-Ito based)
+    --lxb-cat-1: #0072b2;
+    --lxb-cat-2: #e69f00;
+    --lxb-cat-3: #009e73;
+    --lxb-cat-4: #d55e00;
+    --lxb-cat-5: #cc79a7;
+    --lxb-cat-6: #56b4e9;
+    --lxb-cat-7: #8c8c3f;
+    --lxb-cat-8: #7a7f8c;
+
+    &[data-theme="dark"] {
+        --lxb-bg: #0c111b;
+        --lxb-surface: #151d2e;
+        --lxb-surface-2: #1b2539;
+        --lxb-border: #2a3650;
+        --lxb-text: #e8edf6;
+        --lxb-text-muted: #9fadc4;
+        --lxb-grid: #27334b;
+        --lxb-accent: #8aa4ff;
+        --lxb-accent-text: #0c111b;
+        --lxb-good: #4ade80;
+        --lxb-bad: #ff8a80;
+        --lxb-warn: #f5c451;
+        --lxb-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+        --lxb-cat-1: #56a8e8;
+        --lxb-cat-2: #f2b53d;
+        --lxb-cat-3: #2ec4a0;
+        --lxb-cat-4: #ff8a4c;
+        --lxb-cat-5: #e59fc4;
+        --lxb-cat-6: #7cc6f4;
+        --lxb-cat-7: #d4d46a;
+        --lxb-cat-8: #aab1c0;
+    }
+
+    position: relative;
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 24px 28px 48px;
+    background: var(--lxb-bg);
+    color: var(--lxb-text);
+    font-family: var(--lxb-font);
+    font-size: 14px;
+    line-height: 1.45;
+    overflow: auto;
+
+    *, *::before, *::after { box-sizing: border-box; }
+    h1, h3 { margin: 0; font-weight: 650; color: inherit; }
+    button { font-family: inherit; }
+
+    // -- top bar ------------------------------------------------------------
+    .lxb-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .lxb-top__left, .lxb-top__right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .lxb-title { font-size: 24px; letter-spacing: -0.01em; }
+
+    // -- controls -----------------------------------------------------------
+    .lxb-btn {
+        appearance: none; cursor: pointer;
+        padding: 8px 14px; border-radius: var(--lxb-radius-sm);
+        border: 1px solid var(--lxb-border); background: var(--lxb-surface); color: var(--lxb-text);
+        font-size: 13px; font-weight: 550;
+        transition: background var(--lxb-motion) var(--lxb-ease), border-color var(--lxb-motion) var(--lxb-ease);
+        &:hover { background: var(--lxb-surface-2); }
+        &--ghost { background: transparent; border-color: transparent; color: var(--lxb-text-muted); &:hover { color: var(--lxb-text); } }
+        &--primary { background: var(--lxb-accent); border-color: var(--lxb-accent); color: var(--lxb-accent-text); &:hover { background: var(--lxb-accent); filter: brightness(1.08); } }
+    }
+    .lxb-icon-btn {
+        appearance: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 8px; border: 0; background: transparent; color: var(--lxb-text-muted);
+        &:hover { background: var(--lxb-surface-2); color: var(--lxb-text); }
+    }
+    .lxb-link { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; color: var(--lxb-accent); font-size: 13px; }
+    .lxb-btn:focus-visible, .lxb-icon-btn:focus-visible, .lxb-link:focus-visible, .lxb-card:focus-visible, .lxb-board-card:focus-visible, .lxb-row--open:focus-visible {
+        outline: 2px solid var(--lxb-accent); outline-offset: 2px;
+    }
+    .lxb-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--lxb-surface); border: 1px solid var(--lxb-border); font-size: 12px; font-weight: 550; color: var(--lxb-text-muted); &--muted { opacity: 0.85; } }
+
+    // -- list of dashboards -----------------------------------------------------
+    .lxb-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--lxb-gap); }
+    .lxb-board-card {
+        appearance: none; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 6px;
+        padding: var(--lxb-pad); border-radius: var(--lxb-radius); border: 1px solid var(--lxb-border);
+        background: var(--lxb-surface); color: var(--lxb-text); box-shadow: var(--lxb-shadow);
+        transition: transform var(--lxb-motion) var(--lxb-ease), border-color var(--lxb-motion) var(--lxb-ease);
+        &:hover { transform: translateY(-2px); border-color: var(--lxb-accent); }
+    }
+    .lxb-board-card__name { font-size: 17px; font-weight: 650; }
+    .lxb-board-card__meta { color: var(--lxb-text-muted); font-size: 13px; }
+    .lxb-board-card__chips { display: flex; gap: 6px; margin-top: 6px; }
+
+    // -- grid: 24 columns; one column on small screens -----------------------------
+    .lxb-grid {
+        display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); grid-auto-rows: 40px; gap: var(--lxb-gap);
+        > * { grid-column: var(--lxb-x) / span var(--lxb-w); grid-row: var(--lxb-y) / span var(--lxb-h); }
+    }
+
+    // -- widget card -----------------------------------------------------------------
+    .lxb-card {
+        position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0;
+        padding: 16px 18px 14px; border-radius: var(--lxb-radius); border: 1px solid var(--lxb-border);
+        background: var(--lxb-surface); box-shadow: var(--lxb-shadow);
+    }
+    .lxb-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .lxb-card__title { font-size: 14px; font-weight: 650; color: var(--lxb-text-muted); letter-spacing: 0.01em; }
+    .lxb-card__body { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .lxb-card__warn { margin-top: 8px; font-size: 12px; color: var(--lxb-warn); display: flex; flex-direction: column; gap: 2px; }
+
+    // -- charts ---------------------------------------------------------------------------
+    .lxb-chart { position: absolute; inset: 0; }
+    .lxb-chart__canvas { position: absolute; inset: 0; }
+    .lxb-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    // -- KPI ---------------------------------------------------------------------------------
+    .lxb-kpis { display: flex; flex-wrap: wrap; gap: 20px; height: 100%; align-items: stretch; cursor: default; }
+    .lxb-kpi { flex: 1 1 140px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; }
+    .lxb-kpi__label { color: var(--lxb-text-muted); font-size: 13px; }
+    // clamp() is interpolated because libsass would try to evaluate it
+    .lxb-kpi__value { font-size: #{"clamp(28px, 3.2vw, 44px)"}; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; overflow-wrap: anywhere; }
+    .lxb-kpi__delta { font-size: 13px; font-weight: 600; &--up { color: var(--lxb-good); } &--down { color: var(--lxb-bad); } &--flat { color: var(--lxb-text-muted); } }
+    .lxb-kpi__trend { position: relative; height: 48px; margin-top: 6px; }
+
+    // -- table ------------------------------------------------------------------------------------
+    .lxb-table-wrap { overflow: auto; max-height: 100%; }
+    .lxb-drill .lxb-table td.lxb-num { text-align: right; }
+    .lxb-table {
+        width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums;
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--lxb-grid); white-space: nowrap; }
+        thead th { position: sticky; top: 0; background: var(--lxb-surface); color: var(--lxb-text-muted); font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; }
+        tfoot th { position: sticky; bottom: 0; background: var(--lxb-surface-2); font-weight: 700; border-top: 2px solid var(--lxb-border); }
+        .lxb-num { text-align: right; }
+        .lxb-row--open { cursor: pointer; &:hover td { background: var(--lxb-surface-2); } }
+    }
+
+    // -- states ------------------------------------------------------------------------------------
+    .lxb-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; height: 100%; min-height: 80px; text-align: center; color: var(--lxb-text-muted); padding: 12px; }
+    .lxb-state__title { font-weight: 650; color: var(--lxb-text); }
+    .lxb-state--error .lxb-state__title { color: var(--lxb-bad); }
+    .lxb-state__text { max-width: 46ch; overflow-wrap: anywhere; }
+    .lxb-page-state { margin: 64px auto; }
+    .lxb-skeleton {
+        height: 100%; min-height: 80px; border-radius: var(--lxb-radius-sm);
+        background: linear-gradient(90deg, var(--lxb-surface-2) 25%, var(--lxb-grid) 37%, var(--lxb-surface-2) 63%); background-size: 400% 100%;
+        animation: lxb-shimmer 1.4s ease infinite;
+        &--page { height: 200px; }
+    }
+
+    // -- explain popover -------------------------------------------------------------------------------
+    .lxb-explain {
+        position: absolute; z-index: 5; left: 12px; right: 12px; top: 46px; padding: 14px 16px;
+        border-radius: var(--lxb-radius-sm); border: 1px solid var(--lxb-border); background: var(--lxb-surface); box-shadow: var(--lxb-shadow);
+        max-height: #{"calc(100% - 58px)"}; overflow: auto;
+    }
+    .lxb-explain__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .lxb-explain__list { margin: 0 0 8px; padding-left: 18px; &--detail { color: var(--lxb-text-muted); } }
+    .lxb-explain__line--warning { color: var(--lxb-warn); }
+
+    // -- drill panel ----------------------------------------------------------------------------------------
+    .lxb-drill {
+        position: fixed; z-index: 1100; top: 0; right: 0; bottom: 0; width: #{"min(620px, 100vw)"};
+        display: flex; flex-direction: column; background: var(--lxb-surface); color: var(--lxb-text);
+        border-left: 1px solid var(--lxb-border); box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
+        animation: lxb-slide var(--lxb-motion) var(--lxb-ease);
+    }
+    .lxb-drill__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 20px 12px; border-bottom: 1px solid var(--lxb-border); }
+    .lxb-drill__title { font-size: 16px; font-weight: 650; }
+    .lxb-drill__sub { color: var(--lxb-text-muted); margin-top: 2px; }
+    .lxb-drill__body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 20px; }
+    .lxb-drill__count { color: var(--lxb-text-muted); margin-bottom: 8px; }
+    .lxb-drill__foot { padding: 12px 20px; border-top: 1px solid var(--lxb-border); display: flex; justify-content: flex-end; }
+
+    @media (max-width: 768px) {
+        padding: 16px 14px 40px;
+        .lxb-title { font-size: 20px; }
+        .lxb-grid {
+            grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto;
+            > * { grid-column: 1; grid-row: auto; order: var(--lxb-order); min-height: 300px; }
+            > *:has(.lxb-kpis) { min-height: 170px; }
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .lxb-skeleton, .lxb-drill { animation: none; }
+        .lxb-board-card:hover { transform: none; }
+    }
+}
+
+@keyframes lxb-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@keyframes lxb-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }

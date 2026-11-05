@@ -23,6 +23,7 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_open_board" type="object" string="Open dashboard" class="btn-primary" invisible="not id"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,active" options="{'clickable': '1'}"/>
                 </header>
                 <sheet>
@@ -86,6 +87,4 @@
         <field name="search_view_id" ref="view_levelix_board_search"/>
     </record>
 
-    <menuitem id="menu_levelix_board_root" name="Levelix Boards" sequence="60" groups="base.group_user"
-              action="action_levelix_board"/>
 </odoo>

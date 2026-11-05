@@ -80,6 +80,7 @@ class Plan:
     measures: list
     top_n: Optional[int] = None
     others: bool = False
+    totals: bool = False  # a table also gets the grand total of its additive measures
     fill: Optional[FillSpec] = None
     tz: str = "UTC"
     week_start: int = 1
@@ -125,6 +126,7 @@ class Planner:
             measures=measures,
             top_n=data.limit,
             others=data.others,
+            totals=widget.type == "table" and not data.having and any(m.additive for m in measures),
             fill=fill,
             tz=tz,
             week_start=week_start,

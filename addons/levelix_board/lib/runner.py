@@ -40,7 +40,7 @@ class Runner:
                 having=plan.having, limit=plan.query_limit, order=plan.order,
             )
             total = None
-            if plan.others:
+            if plan.others or plan.totals:
                 rows = model.formatted_read_group(plan.domain, [], plan.aggregates)
                 total = rows[0] if rows else {}
         return RawResult(groups, total)

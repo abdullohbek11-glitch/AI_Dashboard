@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- The dashboard page is a client action (static/src/page); "Manage" is the temporary JSON editor -->
+    <record id="action_board_page" model="ir.actions.client">
+        <field name="name">Levelix Boards</field>
+        <field name="tag">levelix_board.board_page</field>
+    </record>
+
+    <menuitem id="menu_levelix_board_root" name="Levelix Boards" sequence="60" groups="base.group_user" action="action_board_page"/>
+    <menuitem id="menu_levelix_board_open" name="Dashboards" parent="menu_levelix_board_root" sequence="10" action="action_board_page"/>
+    <menuitem id="menu_levelix_board_manage" name="Manage" parent="menu_levelix_board_root" sequence="20" action="action_levelix_board"/>
+</odoo>

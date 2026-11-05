@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.TableWidget">
+        <div class="lxb-table-wrap">
+            <table class="lxb-table">
+                <thead>
+                    <tr>
+                        <th t-foreach="model.columns" t-as="column" t-key="column.id"
+                            t-att-class="{'lxb-num': isNumeric(column)}" t-esc="column.label"/>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="model.rows" t-as="row" t-key="row_index"
+                        t-att-class="{'lxb-row--open': canOpen(row_index)}"
+                        t-att-tabindex="canOpen(row_index) ? 0 : -1"
+                        t-on-click="() => this.open(row_index)"
+                        t-on-keydown="(ev) => this.onKey(ev, row_index)">
+                        <td t-foreach="model.columns" t-as="column" t-key="column.id"
+                            t-att-class="{'lxb-num': isNumeric(column)}" t-esc="cell(column, row[column_index])"/>
+                    </tr>
+                </tbody>
+                <tfoot t-if="model.totals">
+                    <tr>
+                        <th t-foreach="model.columns" t-as="column" t-key="column.id"
+                            t-att-class="{'lxb-num': isNumeric(column)}"
+                            t-esc="totalCell(column, model.totals[column_index], column_index)"/>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </t>
+</templates>

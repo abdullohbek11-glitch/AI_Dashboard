@@ -1,0 +1,14 @@
+{
+  "name": "levelix-echarts-bundle",
+  "private": true,
+  "description": "Builds the custom ECharts bundle served by levelix_board (static/lib/echarts). Run: npm install && npm run build",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "echarts": "5.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.5"
+  }
+}

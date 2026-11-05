@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.ChartBody">
+        <div class="lxb-chart" t-ref="root">
+            <div class="lxb-chart__canvas" role="img" t-att-aria-label="props.widget.title or props.widget.id"/>
+            <table class="lxb-sr-only">
+                <thead>
+                    <tr>
+                        <th t-esc="props.frame.columns[0].label"/>
+                        <th t-foreach="model.series" t-as="series" t-key="series_index" t-esc="series.name"/>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="tableRows" t-as="row" t-key="row_index">
+                        <td t-foreach="row" t-as="cell" t-key="cell_index" t-esc="cell"/>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </t>
+</templates>

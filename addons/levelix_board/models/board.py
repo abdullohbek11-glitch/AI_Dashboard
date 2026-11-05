@@ -82,6 +82,14 @@ class LevelixBoard(models.Model):
             board._record_version(note, origin)
         return True
 
+    def action_open_board(self):
+        """Open this dashboard on the full-screen page."""
+        self.ensure_one()
+        return {
+            "type": "ir.actions.client", "tag": "levelix_board.board_page", "name": self.name,
+            "context": {"board_id": self.id},
+        }
+
     def _record_version(self, note, origin):
         self.ensure_one()
         self.env["levelix.board.version"].create({

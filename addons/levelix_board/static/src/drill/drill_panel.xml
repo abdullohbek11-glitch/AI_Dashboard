@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.DrillPanel">
+        <aside class="lxb-drill" role="dialog" aria-label="Records">
+            <header class="lxb-drill__head">
+                <div>
+                    <div class="lxb-drill__title" t-esc="props.request.title"/>
+                    <div class="lxb-drill__sub" t-if="props.request.label" t-esc="props.request.label"/>
+                </div>
+                <button class="lxb-icon-btn" t-ref="close" aria-label="Close" t-on-click="props.onClose">✕</button>
+            </header>
+            <div class="lxb-drill__body">
+                <div t-if="state.loading" class="lxb-skeleton" aria-busy="true"/>
+                <div t-elif="state.error" class="lxb-state lxb-state--error" role="alert">
+                    <div class="lxb-state__text" t-esc="state.error"/>
+                </div>
+                <t t-else="">
+                    <div class="lxb-drill__count">
+                        <t t-if="state.result.truncated">Showing the first <t t-esc="state.result.rows.length"/> of <t t-esc="state.result.total"/></t>
+                        <t t-else=""><t t-esc="state.result.total"/> records</t>
+                    </div>
+                    <div t-if="!state.result.rows.length" class="lxb-state"><div class="lxb-state__title">No records</div></div>
+                    <div t-else="" class="lxb-table-wrap">
+                        <table class="lxb-table">
+                            <thead><tr><th t-foreach="state.result.columns" t-as="column" t-key="column.id" t-att-class="{'lxb-num': isNumber(column)}" t-esc="column.label"/></tr></thead>
+                            <tbody>
+                                <tr t-foreach="state.result.rows" t-as="row" t-key="row_index">
+                                    <td t-foreach="row" t-as="value" t-key="value_index" t-att-class="{'lxb-num': isNumber(state.result.columns[value_index])}" t-esc="cell(state.result.columns[value_index], value)"/>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </t>
+            </div>
+            <footer class="lxb-drill__foot" t-if="state.result">
+                <button class="lxb-btn lxb-btn--primary" t-on-click="openInOdoo">Open in Odoo</button>
+            </footer>
+        </aside>
+    </t>
+</templates>

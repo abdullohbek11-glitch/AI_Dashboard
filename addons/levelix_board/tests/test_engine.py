@@ -206,3 +206,11 @@ class TestEngine(TransactionCase):
                                            domain=[["state", "=", "sale"], ["partner_id", "=", self.partner.id],
                                                    ["date", ">=", "today"], ["date", "<=", "today"]])))["widgets"]["w1"]
         self.assertEqual(out["frame"]["rows"][0][0], 1)  # only the order made just now, not the 2024 ones
+
+    def test_a_table_carries_the_grand_total_even_when_cut(self):
+        out = self.run_one("table", dimensions=[{"field": "date", "granularity": "day"}], limit=1, order={"by": "m1", "dir": "desc"},
+                           measures=[{"id": "m1", "field": "price_subtotal", "agg": "sum"}, {"id": "m2", "agg": "count"}])
+        frame = out["frame"]
+        self.assertEqual(len(frame["rows"]), 1)
+        self.assertAlmostEqual(frame["meta"]["totals"]["m1"], self.expected_total, places=2)
+        self.assertEqual(frame["meta"]["totals"]["m2"], 3)

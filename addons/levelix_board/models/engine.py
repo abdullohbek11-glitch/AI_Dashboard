@@ -146,7 +146,7 @@ class LevelixBoardEngine(models.AbstractModel):
 
         _model, plan = self._plan(widget, catalog)
         runner = runner_lib.Runner(self.env)
-        groups = runner.run(replace(plan, others=False, fill=None)).groups
+        groups = runner.run(replace(plan, others=False, totals=False, fill=None)).groups
         target = catalog.model(config.model)
         try:
             group = drill_lib.find_group(groups, plan.dims, group_ref, FrameBuilder.dim_ref)
