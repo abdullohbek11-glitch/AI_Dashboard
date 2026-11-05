@@ -73,6 +73,53 @@ class TestBoardRecord(BoardCase):
 
 
 @tagged("post_install", "-at_install", "levelix_board")
+class TestBoardProtection(BoardCase):
+    """The owner edits the content; the server alone keeps the version number and the history."""
+
+    def setUp(self):
+        super().setUp()
+        self.board = self.make_board()
+        self.owner_board = self.board.with_user(self.admin)
+
+    def test_the_version_number_cannot_be_set_by_hand(self):
+        with self.assertRaises(AccessError):
+            self.owner_board.write({"version": 99})
+        self.assertEqual(self.board.version, 1)
+
+    def test_the_owner_cannot_give_the_dashboard_away_or_move_it(self):
+        with self.assertRaises(AccessError):
+            self.owner_board.write({"user_id": self.salesman.id})
+        other = self.env["res.company"].create({"name": "Levelix protection company"})
+        with self.assertRaises(AccessError):
+            self.owner_board.write({"company_id": other.id})
+        self.owner_board.write({"user_id": self.admin.id, "company_id": self.board.company_id.id, "name": "Same owner, same company"})
+        self.assertEqual(self.board.name, "Same owner, same company")  # saving the same values is not a change
+
+    def test_a_manager_can_move_a_dashboard(self):
+        manager = new_test_user(self.env, "board_manager2", groups="base.group_user,levelix_board.group_board_manager")
+        self.board.with_user(manager).write({"user_id": self.salesman.id})
+        self.assertEqual(self.board.user_id, self.salesman)
+
+    def test_a_version_row_cannot_be_forged_but_saving_still_writes_one(self):
+        with self.assertRaises(AccessError):
+            self.env["levelix.board.version"].with_user(self.admin).create(
+                {"board_id": self.board.id, "version": 5, "spec": {"anything": "goes"}, "origin": "ai"})
+        changed = dict(self.board.spec, title="Changed")
+        self.owner_board.write({"spec": changed})
+        row = self.board.version_ids.filtered(lambda v: v.version == 2)
+        self.assertEqual((row.origin, row.author_id), ("manual", self.admin))  # written by the server, with the real author
+
+    def test_a_wrongly_typed_spec_is_a_clear_error_not_a_server_error(self):
+        spec = copy.deepcopy(self.board.spec)
+        spec["widgets"][0]["data"]["having"] = [[["m1"], ">", 1]]
+        with self.assertRaises(SpecInvalid) as ctx:
+            self.as_user(self.admin).lx_save(self.board.id, spec)
+        self.assertEqual(ctx.exception.errors[0].code, "BAD_HAVING")
+        out = self.env["levelix.board.engine"].with_user(self.admin)._validate_spec(spec)
+        self.assertFalse(out["ok"])
+
+
+@tagged("post_install", "-at_install", "levelix_board")
 class TestBoardVisibility(BoardCase):
     def setUp(self):
         super().setUp()

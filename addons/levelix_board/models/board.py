@@ -2,7 +2,7 @@
 import json
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 
 from ..lib.errors import BoardError
 
@@ -68,7 +68,23 @@ class LevelixBoard(models.Model):
             board._record_version(self.env.context.get("lx_note"), self.env.context.get("lx_origin") or "manual")
         return boards
 
+    def _check_protected_fields(self, vals):
+        """The version number is ours alone; the owner and the company change only by a board manager."""
+        if self.env.su:
+            return
+        if "version" in vals:
+            raise AccessError(_("The version number is managed automatically."))
+        manager = self.env.user.has_group("levelix_board.group_board_manager")
+        def new_id(value):  # an id from RPC, or a record from Python code
+            return getattr(value, "id", value)
+
+        moved = ("user_id" in vals and any(board.user_id.id != new_id(vals["user_id"]) for board in self)) or (
+            "company_id" in vals and any(board.company_id.id != new_id(vals["company_id"]) for board in self))
+        if moved and not manager:
+            raise AccessError(_("Only a board manager can change the owner or the company of a dashboard."))
+
     def write(self, vals):
+        self._check_protected_fields(vals)
         if "spec" not in vals:
             return super().write(vals)
         spec, _warnings = self.env["levelix.board.engine"]._normalise_spec(vals["spec"])
@@ -92,6 +108,9 @@ class LevelixBoard(models.Model):
 
     def _record_version(self, note, origin):
         self.ensure_one()
-        self.env["levelix.board.version"].create({
-            "board_id": self.id, "version": self.version, "spec": self.spec, "origin": origin, "note": (note or "")[:500],
+        # The only sudo of the module, and not business data: the history row is bookkeeping that nobody may write
+        # by hand (no create right), so the server writes it, naming the real user as the author.
+        self.env["levelix.board.version"].sudo().create({
+            "board_id": self.id, "version": self.version, "spec": self.spec, "origin": origin,
+            "note": (note or "")[:500], "author_id": self.env.user.id,
         })

@@ -25,6 +25,9 @@ DOMAIN_OPERATORS = (
     "=like", "=ilike", "child_of", "parent_of",
 )
 HAVING_OPERATORS = ("=", "!=", "<", "<=", ">", ">=")
+LIST_OPERATORS = ("in", "not in")
+PATTERN_OPERATORS = ("like", "not like", "ilike", "not ilike", "=like", "=ilike")
+SCALAR_TYPES = (str, int, float, bool, type(None))
 ADDITIVE_AGGREGATES = ("sum", "count")
 HOUR_PARTS = ("hour_number", "minute_number", "second_number")
 LOG_DATES = ("create_date", "write_date")
@@ -46,6 +49,19 @@ def allowed_aggregates(field) -> tuple:
     if field.type != "boolean" and field.type not in ("binary", "html"):
         allowed.append("count_distinct")
     return tuple(allowed)
+
+
+def _is_number(value) -> bool:
+    """A number, or text that reads as one ("5"); true/false are not numbers here."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 def _suggest(name: str, candidates) -> str:
@@ -126,6 +142,9 @@ class Validator:
                 continue
             if op not in DOMAIN_OPERATORS:
                 result.errors.append(BoardError("BAD_OPERATOR", dpath, "Operator '%s' is not allowed in a domain." % op))
+                continue
+            if "." not in name and not field.is_temporal:
+                self._check_value(field, op, value, dpath, result)
             if "." not in name and field.is_temporal:
                 for element in (value if isinstance(value, (list, tuple)) else [value]):
                     try:
@@ -133,6 +152,45 @@ class Validator:
                     except ValueError as error:
                         result.errors.append(BoardError(
                             "BAD_DATE", dpath, "Cannot read the date %r on '%s': %s." % (element, field.label, error)))
+
+    def _check_value(self, field, op, value, dpath: str, result: ValidationResult):
+        """What a condition compares with must make sense for the field, or the answer is a silent "0 rows"."""
+        err = lambda code, message: result.errors.append(BoardError(code, dpath, message))  # noqa: E731
+        if op in ("child_of", "parent_of"):
+            return
+        if op in LIST_OPERATORS:
+            if not isinstance(value, (list, tuple)):
+                err("BAD_VALUE", "'%s' %s needs a list of values, for example [\"a\", \"b\"]." % (field.label, op))
+                return
+            items = list(value)
+        elif isinstance(value, (list, tuple)):
+            err("BAD_VALUE", "'%s' %s compares with one value, not a list. Use 'in' for several." % (field.label, op))
+            return
+        else:
+            items = [value]
+        if not all(isinstance(item, SCALAR_TYPES) for item in items):
+            err("BAD_VALUE", "Values compared with '%s' must be text, numbers, true/false or null." % field.label)
+            return
+        if op in PATTERN_OPERATORS:
+            return
+        empty = (False, None)
+        if field.type == "selection" and field.selection:
+            allowed = [key for key, _label in field.selection]
+            for item in items:
+                if item not in empty and item not in allowed:
+                    options = ", ".join("%s (%s)" % pair for pair in field.selection[:12])
+                    err("UNKNOWN_VALUE", "'%s' is not a value of '%s'. Use one of: %s." % (item, field.label, options))
+                    return
+        elif field.is_numeric:
+            for item in items:
+                if item not in empty and not _is_number(item):
+                    err("BAD_VALUE", "'%s' is a number field; %r is not a number." % (field.label, item))
+                    return
+        elif field.type == "boolean":
+            for item in items:
+                if item is not None and item not in (True, False, 0, 1):
+                    err("BAD_VALUE", "'%s' is a yes/no field; compare it with true or false, not %r." % (field.label, item))
+                    return
 
     def _split_dimension(self, dim, model, path, result):
         """Return the FieldInfo that decides the dimension's type, or ``None`` after reporting."""
@@ -228,6 +286,9 @@ class Validator:
             return
         opath = path + ".data.order"
         by, direction = data.order.get("by"), data.order.get("dir", "asc")
+        if not isinstance(by, str):
+            result.errors.append(BoardError("BAD_ORDER", opath, "'by' must be a measure id or a dimension name (text)."))
+            return
         if direction not in ("asc", "desc"):
             result.errors.append(BoardError("BAD_ORDER", opath, "'dir' must be 'asc' or 'desc'."))
         dim_names = {d.field for d in data.dimensions} | {d.key for d in data.dimensions}
@@ -263,6 +324,9 @@ class Validator:
                 result.errors.append(BoardError("BAD_HAVING", hpath, "A 'having' condition looks like [measure_id, operator, number]."))
                 continue
             mid, op, value = item
+            if not isinstance(mid, str) or not isinstance(op, str):
+                result.errors.append(BoardError("BAD_HAVING", hpath, "A 'having' condition looks like [measure_id, operator, number]."))
+                continue
             if mid not in measure_ids:
                 result.errors.append(BoardError("UNKNOWN_MEASURE", hpath, "No measure with id '%s'." % mid))
             if op not in HAVING_OPERATORS:

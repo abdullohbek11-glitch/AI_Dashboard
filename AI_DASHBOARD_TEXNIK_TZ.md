@@ -489,6 +489,13 @@ Amalga oshirishda (`addons/levelix_board`) quyidagilar qo'shildi yoki aniqlashti
 - **Drill xatolari (saqlashda dry-run):** `DRILL_UNMAPPED` (o'q yoki domain maydonining ochiladigan modelda juftligi yo'q), `DRILL_BAD_COLUMN` (x2many, binary, html ustun bo'lmaydi), `BAD_ACTION`. `interact` faqat `on_click` kalitini qabul qiladi. `filter` va `open_record` harakatlari nomi bilan taniladi, lekin `UNSUPPORTED` (F6 dan keyin).
 - **Drill natijasi:** `{model, open_as, columns, rows, ids, total, truncated, action}`; 80 qatorgacha, sana-vaqt foydalanuvchi vaqt zonasida, `action` — shu domain bilan `ir.actions.act_window`.
 
+### 6.11. F4 dan oldingi qattiqlashtirish (PHASES_1_3_ANALYSIS.md 7.3 #1–#4)
+
+- **Tur xavfsizligi:** `order.by`, `having` elementlari noto'g'ri turda bo'lsa `BAD_ORDER` / `BAD_HAVING`. Validator yoki `Spec` o'qishda kutilmagan turdagi qiymat `TypeError/KeyError/...` bersa, `_normalise_spec` va `_validate_spec` ularni `BAD_SPEC` ("kutilmagan shakl") ga aylantiradi: server xatosi bo'lmaydi.
+- **Domain qiymatlari** (nuqtasiz maydon nomlari uchun): `in`/`not in` ro'yxat talab qiladi, boshqa operatorlar bitta qiymat (`BAD_VALUE`); qiymat matn/son/mantiqiy/`null` bo'lishi shart; `selection` maydonda qiymat variantlar ichida bo'lishi shart (`UNKNOWN_VALUE`, xabarda variantlar ro'yxati); son maydonda son (yoki son ko'rinishidagi matn); mantiqiy maydonda `true/false` (yoki 0/1). `like/ilike` va `child_of/parent_of` operatorlari va nuqtali yo'llar tekshirilmaydi.
+- **Himoyalangan maydonlar:** `version` ni qo'lda yozib bo'lmaydi (`AccessError`); `user_id` va `company_id` ni faqat `Board manager` o'zgartiradi (qiymat o'zgarmasa xato yo'q). Superuser muhiti (`env.su`) bundan mustasno.
+- **Tarix yozuvlari:** `levelix.board.version` ga oddiy foydalanuvchida ham, managerda ham `create` huquqi **yo'q**. Yozuvni serverning o'zi yaratadi (`board._record_version`), `author_id` = haqiqiy foydalanuvchi. Bu modulning **yagona `sudo()`** i va u biznes ma'lumotni o'qimaydi, faqat tarix qatorini yozadi (T11 qoidasining kelishilgan istisnosi).
+
 ---
 
 ## 7. Drill-down, tahrirlash, maslahatlar

@@ -193,3 +193,45 @@ class TestValidator(BaseCase):
         with self.assertRaises(Exception) as ctx:
             result.raise_if_invalid()
         self.assertEqual(ctx.exception.errors[0].code, "NOT_AGGREGATABLE")
+
+    # -- values of conditions ------------------------------------------------
+
+    def test_a_selection_value_must_exist(self):
+        self.assertEqual(self.codes(domain=[["state", "=", "done"]]), ["UNKNOWN_VALUE"])  # Odoo 19 has no "done"
+        self.assertEqual(self.codes(domain=[["state", "in", ["sale", "done"]]]), ["UNKNOWN_VALUE"])
+        message = self.check(domain=[["state", "=", "done"]]).errors[0].detail
+        self.assertIn("sale (Sales Order)", message)  # the way out is in the message
+        for ok in ([["state", "=", "sale"]], [["state", "!=", False]], [["state", "in", ["sale", "cancel"]]]):
+            self.assertEqual(self.codes(domain=ok), [], ok)
+
+    def test_in_needs_a_list_and_other_operators_one_value(self):
+        self.assertEqual(self.codes(domain=[["state", "in", "sale"]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["state", "not in", "abc"]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["state", "=", ["sale"]]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["partner_id", "in", 5]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["partner_id", "in", [5, 6]]]), [])
+
+    def test_values_must_be_plain(self):
+        self.assertEqual(self.codes(domain=[["state", "=", {"a": 1}]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["state", "in", [["sale"]]]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["partner_id", "=", [1, 2]]]), ["BAD_VALUE"])
+
+    def test_numbers_and_booleans_are_checked(self):
+        self.assertEqual(self.codes(domain=[["price_subtotal", ">", "lots"]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["price_subtotal", ">", True]]), ["BAD_VALUE"])
+        for ok in ([["price_subtotal", ">", 100]], [["price_subtotal", ">", "100.5"]], [["price_subtotal", "=", False]]):
+            self.assertEqual(self.codes(domain=ok), [], ok)
+        self.assertEqual(self.codes(domain=[["is_paid", "=", "yes"]]), ["BAD_VALUE"])
+        self.assertEqual(self.codes(domain=[["is_paid", "=", True]]), [])
+
+    def test_patterns_and_relational_searches_are_left_alone(self):
+        for ok in ([["name", "ilike", "S00"]], [["partner_id", "child_of", 3]], [["partner_id", "=", "Ali"]]):
+            self.assertEqual(self.codes(domain=ok), [], ok)
+
+    # -- wrongly typed JSON never crashes ------------------------------------------
+
+    def test_order_and_having_with_wrong_types_are_errors_not_crashes(self):
+        self.assertEqual(self.codes(order={"by": ["m1"]}), ["BAD_ORDER"])
+        self.assertEqual(self.codes(order={"by": 5}), ["BAD_ORDER"])
+        self.assertEqual(self.codes(having=[[["m1"], ">", 1]]), ["BAD_HAVING"])
+        self.assertEqual(self.codes(having=[["m1", [">"], 1]]), ["BAD_HAVING"])

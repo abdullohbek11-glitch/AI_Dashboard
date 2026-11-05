@@ -27,3 +27,11 @@
 - Klaviatura: kartalar fokuslanadi, jadval qatori Enter/Space bilan ochiladi, grafikning matnli jadvali ekran o'qigichlar uchun bor. Avtomatik testda tekshirilmagan.
 - Domain qiymatlarini tekshirish (F1 topilmasi) hali tuzatilmagan: noto'g'ri selection qiymati jim 0 qator beradi.
 - JS o'zgargach eski asset keshi qolsa: `ir.attachment` dan `/web/assets/%` ni o'chirish va konteynerni qayta ishga tushirish.
+
+## F4 dan oldingi qattiqlashtirish (2026-11-05, tahlil hujjatidagi #1–#4)
+- Validator: `order.by`/`having` turi; domain qiymatlari (`BAD_VALUE`, `UNKNOWN_VALUE`); kutilmagan shakl `BAD_SPEC` ga aylanadi (server xatosi emas).
+- `version` qo'lda yozilmaydi; `user_id`/`company_id` ni faqat manager o'zgartiradi.
+- Versiya yozuvini foydalanuvchi yarata olmaydi (ACL), server yozadi (`sudo`, muallif = haqiqiy foydalanuvchi).
+- Testlar: Python 170 (11 yangi), JS 28, brauzer 13/13; forma orqali saqlash qayta tekshirildi.
+- Jonli qayta tekshiruv: L1, L1b, L2, L3, L3b, L6, L6c, M1, M2, L8 hammasi endi aniq xato beradi, to'g'ri spec va saqlash ishlaydi, tarixda muallif `sotuvchi`.
+- `scripts/f2_ui_browser.py` F3 menyusiga moslandi (forma "Manage" ostida).

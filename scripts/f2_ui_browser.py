@@ -15,7 +15,8 @@ with sync_playwright() as p:
     # open the Dashboards app from the app menu
     pg.click(".o_menu_toggle, .o_navbar_apps_menu button"); pg.wait_for_timeout(800)
     pg.screenshot(path=OUT+"f2_1_appmenu.png")
-    pg.click(".o-dropdown-item:has-text('Levelix Boards'), a:has-text('Levelix Boards')"); pg.wait_for_selector(".o_list_view, .o_control_panel",timeout=20000); pg.wait_for_timeout(1000)
+    pg.click(".o-dropdown-item:has-text('Levelix Boards'), a:has-text('Levelix Boards')"); pg.wait_for_selector(".lxb",timeout=20000)
+    pg.click(".o_menu_sections a:has-text('Manage'), .o_menu_sections button:has-text('Manage')"); pg.wait_for_selector(".o_list_view", timeout=20000)
     pg.screenshot(path=OUT+"f2_2_list.png")
     pg.click(".o_list_button_add, button.o-kanban-button-new, button:has-text('New')"); pg.wait_for_selector(".o_form_view",timeout=20000); pg.wait_for_timeout(1500)
     pg.fill(".o_field_widget[name=name] input","UI test board")

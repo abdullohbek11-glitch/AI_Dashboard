@@ -25,6 +25,7 @@ from ..lib.validator import Validator
 from .env_catalog import EnvCatalog
 
 _logger = logging.getLogger(__name__)
+_SHAPE_ERRORS = (TypeError, AttributeError, KeyError, IndexError, ValueError)  # what a wrongly typed JSON value raises
 
 
 class LevelixBoardEngine(models.AbstractModel):
@@ -38,19 +39,30 @@ class LevelixBoardEngine(models.AbstractModel):
         """Structure and semantics of a whole spec. Never raises for a bad spec."""
         try:
             spec = Spec.from_raw(raw)
+            return Validator(EnvCatalog(self.env)).validate_spec(spec).to_dict()
         except BoardError as error:
             return {"ok": False, "errors": [error.to_dict()], "warnings": []}
-        return Validator(EnvCatalog(self.env)).validate_spec(spec).to_dict()
+        except _SHAPE_ERRORS:
+            return {"ok": False, "errors": [self._odd_shape().to_dict()], "warnings": []}
 
     @api.model
     def _normalise_spec(self, raw):
         """``(clean_spec, warnings)`` or raise ``BoardError`` / ``SpecInvalid``: what saving a spec needs."""
         if len(json.dumps(raw, ensure_ascii=False, default=str).encode("utf-8")) > MAX_SPEC_BYTES * 2:
             raise BoardError("SPEC_TOO_LARGE", "", t("The spec is larger than %d KB.") % (MAX_SPEC_BYTES // 1024))
-        spec = Spec.from_raw(raw)
-        result = Validator(EnvCatalog(self.env)).validate_spec(spec)
+        try:
+            spec = Spec.from_raw(raw)
+            result = Validator(EnvCatalog(self.env)).validate_spec(spec)
+        except _SHAPE_ERRORS as error:
+            raise self._odd_shape() from error
         result.raise_if_invalid()
         return spec.to_raw(), [w.to_dict() for w in result.warnings]
+
+    @staticmethod
+    def _odd_shape() -> BoardError:
+        """Safety net for a value of an unexpected type that no specific check caught: a clear error, never a server error."""
+        _logger.exception("The spec has an unexpected shape")
+        return BoardError("BAD_SPEC", "", t("The spec has an unexpected shape and could not be checked. Compare it with the format description."))
 
     # -- running -------------------------------------------------------------------
 
