@@ -478,6 +478,17 @@ Amalga oshirishda (`addons/levelix_board`) quyidagilar qo'shildi yoki aniqlashti
 - **Frame:** sana o'qi qiymati foydalanuvchi vaqt zonasidagi `YYYY-MM-DD` (hafta, oy, chorak, yil uchun davr boshi). `group_refs[i]` har o'q uchun xom kalitlar ro'yxati (sana: UTC kalit, bog'lanish: id, tanlov: qiymat).
 - **Metod nomlari:** `levelix.board.engine._run_spec`, `_validate_spec` (ochiq RPC emas). Ochiq `lx_*` metodlari F2 da.
 
+### 6.10. F2 da aniqlangan qo'shimcha qoidalar
+
+- **Modellar:** `levelix.board`, `levelix.board.version`. `spec` ni har o'zgartirish (ORM `write`/`create` ham, `lx_save` ham) **saqlovchi foydalanuvchining huquqi bilan** qayta tekshiriladi va yangi versiya yozadi. Spec o'zgarmasa versiya o'smaydi. Shuning uchun sotuv ma'lumotini o'qiy olmaydigan menejer sotuv spec'ini saqlay olmaydi (`NO_ACCESS`).
+- **Huquq:** barcha ichki foydalanuvchi o'z dashboard'ini yaratadi; ko'rish: egasi, yoki `state=active` va `share_mode` (`company` / `groups`). Yozish: egasi. Guruh `Board manager` hammasini ko'radi va o'zgartiradi. Tarix (`version`) egasi va manager uchun. Boshqa kompaniya dashboard'i ko'rinmaydi.
+- **Ko'rinmaydigan = topilmadi:** ko'rish huquqi yo'q dashboard `NOT_FOUND` beradi (mavjudligi ham sirli). Ko'radi, lekin yozolmaydi: `NO_ACCESS`.
+- **RPC (F2):** `lx_list`, `lx_load`, `lx_run(id, widget_ids, filter_values, explain)`, `lx_explain`, `lx_drill`, `lx_save`. `lx_restore`, `lx_share`, `lx_apply_patch` F7 da. `filter_values` bo'sh bo'lmasa `UNSUPPORTED` (filtrlar F6 da). Argument xatosi: `BAD_ARGUMENT`. Noma'lum vidjet: `UNKNOWN_WIDGET`.
+- **Kutilmagan xato:** vidjet ichidagi kutilmagan xato `INTERNAL` bo'lib shu vidjetga qaytadi (tafsilot faqat serverning jurnalida), qolgan vidjetlar ishlaydi.
+- **Drill:** klient `group_ref` yuboradi: `frame.meta.group_refs[i]` ning o'zi. Server vidjetni qayta ishga tushirib, shu kalitli haqiqiy guruhni topadi, domain'ni o'zi quradi. Mos guruh yo'q: `DRILL_BAD_REF`. `fill_gaps` qo'shgan bo'sh kun: bo'sh natija (0 qator). "Boshqalar" qatori kaliti `["__others__"]`: `DRILL_OTHERS`. `on_click` yo'q: `DRILL_NOT_CONFIGURED`.
+- **Drill xatolari (saqlashda dry-run):** `DRILL_UNMAPPED` (o'q yoki domain maydonining ochiladigan modelda juftligi yo'q), `DRILL_BAD_COLUMN` (x2many, binary, html ustun bo'lmaydi), `BAD_ACTION`. `interact` faqat `on_click` kalitini qabul qiladi. `filter` va `open_record` harakatlari nomi bilan taniladi, lekin `UNSUPPORTED` (F6 dan keyin).
+- **Drill natijasi:** `{model, open_as, columns, rows, ids, total, truncated, action}`; 80 qatorgacha, sana-vaqt foydalanuvchi vaqt zonasida, `action` — shu domain bilan `ir.actions.act_window`.
+
 ---
 
 ## 7. Drill-down, tahrirlash, maslahatlar

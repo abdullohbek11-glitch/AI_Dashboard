@@ -53,6 +53,14 @@ class Runner:
         return [row["currency_id"][0] for row in rows
                 if row.get("currency_id") and any(row.get(k) for k in keys)]
 
+    def fetch(self, model_name: str, domain: list, fields: list, limit: int, tz: str = "UTC"):
+        """``(rows, total)``: the first ``limit`` records as ``read()`` dicts, plus how many match."""
+        with self._guard():
+            model = self.env[model_name].with_context(tz=tz)
+            total = model.search_count(domain)
+            rows = model.search(domain, limit=limit).read(fields)
+        return rows, total
+
     # -- internals ------------------------------------------------------------
 
     def _model(self, plan: Plan):

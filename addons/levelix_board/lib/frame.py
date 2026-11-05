@@ -15,6 +15,7 @@ from .planner import DimMeta, Plan
 
 NOT_SET = "Not set"
 OTHERS = "Others"
+OTHERS_REF = "__others__"  # group_refs entry of the "Others" row (not a real group, cannot be drilled)
 MAX_FILL_BUCKETS = 3700
 _EPSILON = 1e-9
 
@@ -43,7 +44,7 @@ class FrameBuilder:
         for group in groups:
             rows.append([self._dim_cell(d, group.get(d.key), plan.tz) for d in plan.dims]
                         + [self._measure_cell(m, group.get(m.key)) for m in plan.measures])
-            refs.append([self._dim_ref(group.get(d.key)) for d in plan.dims])
+            refs.append([self.dim_ref(group.get(d.key)) for d in plan.dims])
 
         if plan.fill is not None:
             rows, refs = self._fill(plan, rows, refs)
@@ -51,7 +52,7 @@ class FrameBuilder:
             extra = self._others_row(plan, rows, total)
             if extra:
                 rows.append(extra)
-                refs.append([None])
+                refs.append([OTHERS_REF])
 
         meta = {
             "count": len(rows),
@@ -93,7 +94,7 @@ class FrameBuilder:
         return value
 
     @staticmethod
-    def _dim_ref(value):
+    def dim_ref(value):
         """What identifies the group later (drill-down): the raw key, JSON-safe."""
         if value is False or value is None:
             return None

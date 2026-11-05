@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Temporary screens: the spec is typed as JSON until the dashboard page and designer exist -->
+    <record id="view_levelix_board_list" model="ir.ui.view">
+        <field name="name">levelix.board.list</field>
+        <field name="model">levelix.board</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="user_id"/>
+                <field name="state" widget="badge"/>
+                <field name="share_mode"/>
+                <field name="version"/>
+                <field name="write_date"/>
+                <field name="company_id" groups="base.group_multi_company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_levelix_board_form" model="ir.ui.view">
+        <field name="name">levelix.board.form</field>
+        <field name="model">levelix.board</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,active" options="{'clickable': '1'}"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Dashboard name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="user_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="share_mode"/>
+                            <field name="group_ids" widget="many2many_tags" invisible="share_mode != 'groups'" required="share_mode == 'groups'"/>
+                            <field name="version"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Spec" name="spec">
+                            <field name="spec_text" widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                        <page string="History" name="history">
+                            <field name="version_ids">
+                                <list>
+                                    <field name="version"/>
+                                    <field name="create_date"/>
+                                    <field name="author_id"/>
+                                    <field name="origin"/>
+                                    <field name="note"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_levelix_board_search" model="ir.ui.view">
+        <field name="name">levelix.board.search</field>
+        <field name="model">levelix.board</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="user_id"/>
+                <filter name="mine" string="My dashboards" domain="[('user_id', '=', uid)]"/>
+                <filter name="shared" string="Shared with me" domain="[('user_id', '!=', uid)]"/>
+                <separator/>
+                <filter name="draft" string="Drafts" domain="[('state', '=', 'draft')]"/>
+                <filter name="archived" string="Archived" domain="[('active', '=', False)]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_levelix_board" model="ir.actions.act_window">
+        <field name="name">Levelix Boards</field>
+        <field name="res_model">levelix.board</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_levelix_board_search"/>
+    </record>
+
+    <menuitem id="menu_levelix_board_root" name="Levelix Boards" sequence="60" groups="base.group_user"
+              action="action_levelix_board"/>
+</odoo>

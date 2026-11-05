@@ -13,7 +13,15 @@ user, so every viewer sees only the data he may read. No AI is needed to use it.
     "author": "Levelix",
     "license": "LGPL-3",
     "depends": ["web"],
-    "data": [],
+    "data": [
+        "security/security.xml",
+        "security/ir.model.access.csv",
+        "security/rules.xml",
+        "views/board_views.xml",
+    ],
+    "assets": {
+        "web.assets_backend": ["levelix_board/static/src/error_dialogs.js"],
+    },
     "installable": True,
     "application": False,
 }

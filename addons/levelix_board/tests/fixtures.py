@@ -27,6 +27,16 @@ SALE_REPORT = model("sale.report", "Sales Analysis Report", [
     field("computed_total", "float", "Computed", store=False),
 ], is_report=True)
 
+SALE_ORDER = model("sale.order", "Sales Order", [
+    field("name", "char", "Order Reference"),
+    field("date_order", "datetime", "Order Date"),
+    field("state", "selection", "Status", selection=STATES),
+    field("partner_id", "many2one", "Customer", relation="res.partner"),
+    field("amount_total", "monetary", "Total", aggregator="sum"),
+    field("order_line", "one2many", "Order Lines", relation="sale.order.line"),
+    field("note", "html", "Notes"),
+])
+
 PARTNER = model("res.partner", "Contact", [
     field("name", "char", "Name"),
     field("country_id", "many2one", "Country", relation="res.country"),
@@ -48,7 +58,7 @@ class FakeCatalog:
 
 
 def catalog():
-    return FakeCatalog(SALE_REPORT, PARTNER, COUNTRY, SECRET)
+    return FakeCatalog(SALE_REPORT, SALE_ORDER, PARTNER, COUNTRY, SECRET)
 
 
 def sample_spec():

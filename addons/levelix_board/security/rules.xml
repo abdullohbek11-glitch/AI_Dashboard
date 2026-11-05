@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Companies never mix -->
+    <record id="rule_board_company" model="ir.rule">
+        <field name="name">Dashboard: own companies only</field>
+        <field name="model_id" ref="model_levelix_board"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+
+    <!-- Users read what they own and what is shared (and active) -->
+    <record id="rule_board_read" model="ir.rule">
+        <field name="name">Dashboard: read own or shared</field>
+        <field name="model_id" ref="model_levelix_board"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+        <field name="domain_force">['|', '|',
+            ('user_id', '=', user.id),
+            '&amp;', ('state', '=', 'active'), ('share_mode', '=', 'company'),
+            '&amp;', '&amp;', ('state', '=', 'active'), ('share_mode', '=', 'groups'), ('group_ids', 'in', user.all_group_ids.ids)]</field>
+    </record>
+
+    <!-- Only the owner changes a dashboard -->
+    <record id="rule_board_owner_write" model="ir.rule">
+        <field name="name">Dashboard: owner changes</field>
+        <field name="model_id" ref="model_levelix_board"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="perm_read" eval="False"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+
+    <record id="rule_board_manager" model="ir.rule">
+        <field name="name">Dashboard: manager sees and changes all</field>
+        <field name="model_id" ref="model_levelix_board"/>
+        <field name="groups" eval="[(4, ref('group_board_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+
+    <!-- History is for owners (and managers) -->
+    <record id="rule_board_version_owner" model="ir.rule">
+        <field name="name">Dashboard history: owner</field>
+        <field name="model_id" ref="model_levelix_board_version"/>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+        <field name="domain_force">[('board_id.user_id', '=', user.id)]</field>
+    </record>
+
+    <record id="rule_board_version_manager" model="ir.rule">
+        <field name="name">Dashboard history: manager</field>
+        <field name="model_id" ref="model_levelix_board_version"/>
+        <field name="groups" eval="[(4, ref('group_board_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+    </record>
+</odoo>

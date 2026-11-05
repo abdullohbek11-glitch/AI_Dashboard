@@ -42,7 +42,7 @@ Qoidalar:
 |---|---|---|---|
 | F0 | Tayyorgarlik va prototip tekshiruvi | S | ✅ yopildi 2026-11-05 (`notes/F0_natijalar.md`) |
 | F1 | Spec va so'rov ijrochisi (faqat backend) | L | 🟦 qabul kutilmoqda (`notes/F1_natijalar.md`) |
-| F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | ⬜ |
+| F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | 🟦 qabul kutilmoqda (`notes/F2_natijalar.md`) |
 | F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | ⬜ |
 | F4 | `levelix_ai_core`: AI poydevori va chat | L | ⬜ |
 | F5 | `levelix_ai_board`: chatdan dashboard | L | ⬜ |
@@ -172,13 +172,13 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Ishlar
 
-- [ ] `levelix.board`, `levelix.board.version` (T3.1). Hajm chegarasi 256 KB / 30 vidjet.
-- [ ] Xavfsizlik: `ir.model.access`, yozuv qoidalari (egasi to'liq, boshqalar `share_mode` bo'yicha o'qiydi), guruh `board-manager`.
-- [ ] RPC: `lx_list`, `lx_load`, `lx_run`, `lx_save`, `lx_explain` (T9). Har birida argument va `has_access` tekshiruvi, `sudo` yo'q.
-- [ ] **Drill:** `lx_drill` (T2.3, T7.1): client domain yubormaydi, server `group_ref` dan qayta hosil qiladi; `map`; `DRILL_UNMAPPED`; `search_read` ≤ 80 qator + jami son + "Odoo'da ochish" uchun `act_window`.
-- [ ] Saqlashda dry-run: `on_click` ning `map` va ustunlari ham tekshiriladi.
-- [ ] Oddiy Odoo tomonidagi vaqtinchalik forma: `Dashboard` ro'yxati va formasi, `spec` ni JSON matn sifatida qo'lda kiritish (F3 gacha spec yozish uchun).
-- [ ] Har saqlashda yangi `levelix.board.version` qatori.
+- [x] `levelix.board`, `levelix.board.version` (T3.1). Hajm chegarasi 256 KB / 30 vidjet.
+- [x] Xavfsizlik: `ir.model.access`, yozuv qoidalari (egasi to'liq, boshqalar `share_mode` bo'yicha o'qiydi), guruh `board-manager`.
+- [x] RPC: `lx_list`, `lx_load`, `lx_run`, `lx_save`, `lx_explain` (T9). Har birida argument va `has_access` tekshiruvi, `sudo` yo'q.
+- [x] **Drill:** `lx_drill` (T2.3, T7.1): client domain yubormaydi, server `group_ref` dan qayta hosil qiladi; `map`; `DRILL_UNMAPPED`; `search_read` ≤ 80 qator + jami son + "Odoo'da ochish" uchun `act_window`.
+- [x] Saqlashda dry-run: `on_click` ning `map` va ustunlari ham tekshiriladi.
+- [x] Oddiy Odoo tomonidagi vaqtinchalik forma: `Dashboard` ro'yxati va formasi, `spec` ni JSON matn sifatida qo'lda kiritish (F3 gacha spec yozish uchun).
+- [x] Har saqlashda yangi `levelix.board.version` qatori.
 
 ### Avtomatik test **[A]**
 
@@ -188,6 +188,12 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 - Huquq: egasi bo'lmagan va ulashilmagan dashboard'ni boshqa foydalanuvchi ocholmaydi; ulashilgan bo'lsa **o'z huquqi bilan** raqam ko'radi (`sotuvchi` va `admin` raqamlari farq qiladi).
 - `lx_save` noto'g'ri spec'ni rad etadi, versiya hisoblagichi o'sadi.
 - Kalitlar/argumentlar bo'sh yoki katta bo'lsa tushunarli xato.
+
+### Natija (2026-11-05)
+
+- **[A]** 155 ta test yashil (F1 dan 105 + F2 dan 50): `scripts/run_tests.sh`.
+- **[U]** 1–2 qadamlar haqiqiy brauzerda (headless Chrome, `scripts/f2_ui_browser.py`): spec saqlandi, noto'g'ri spec "Invalid Operation" oynasida tushunarli xabar bilan rad etildi. 3–4 qadamlar JSON-RPC orqali (ikki foydalanuvchi). Menyu nomi "Levelix Boards".
+- Batafsil: `notes/F2_natijalar.md`.
 
 ### UI testi **[U]** (Odoo oddiy interfeysida)
 
@@ -199,7 +205,7 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 ### Tugadi, agar
 
 - **[A]** yashil; drill qatorlari soni mos.
-- UI testi 1–4 o'tdi.
+- UI testi 1–4 o'tdi (1–2 brauzerda, 3–4 RPC orqali) ✅.
 
 ---
 

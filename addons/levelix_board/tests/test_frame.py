@@ -174,7 +174,7 @@ class TestFrame(BaseCase):
         frame = build(p, groups, total={"product_uom_qty:sum": 100.0})
         self.assertEqual(frame.rows[-1], [OTHERS, 100.0 - 10 - 9 - 8])
         self.assertEqual(len(frame.rows), 4)
-        self.assertEqual(frame.meta["group_refs"][-1], [None])
+        self.assertEqual(frame.meta["group_refs"][-1], ["__others__"])
 
     def test_no_others_row_when_nothing_is_left(self):
         p = plan(index=1)

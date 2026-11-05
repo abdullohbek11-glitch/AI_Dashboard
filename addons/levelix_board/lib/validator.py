@@ -7,6 +7,7 @@ self-repair loop feeds these messages straight back to the model.
 import difflib
 
 from . import domain as domain_lib
+from . import drill as drill_lib
 from . import filters
 from .catalog import NUMERIC_TYPES, TEMPORAL_TYPES, Catalog, ModelInfo
 from .errors import BoardError, BoardWarning, ValidationResult
@@ -101,6 +102,7 @@ class Validator:
             self._check_shape(widget, dim_fields, path, result)
         if data.compare is not None:
             err("UNSUPPORTED", dpath + ".compare", "'compare' is not available yet.")
+        result.errors += drill_lib.check(widget, model, self.catalog, path)
         if not result.errors:
             self._warnings(data, model, path, result)
         return result
