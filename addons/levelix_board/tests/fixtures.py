@@ -18,12 +18,16 @@ SALE_REPORT = model("sale.report", "Sales Analysis Report", [
     field("product_id", "many2one", "Product", relation="product.product"),
     field("partner_id", "many2one", "Customer", relation="res.partner"),
     field("price_subtotal", "monetary", "Untaxed Total", aggregator="sum"),
+    field("price_total", "monetary", "Total", aggregator="sum"),
     field("product_uom_qty", "float", "Qty Ordered", aggregator="sum"),
     field("price_unit", "float", "Unit Price", aggregator="avg"),
     field("name", "char", "Order Reference"),
     field("currency_id", "many2one", "Currency", relation="res.currency"),
     field("create_date", "datetime", "Created on"),
     field("is_paid", "boolean", "Paid"),
+    field("user_id", "many2one", "Salesperson", relation="res.users"),
+    field("company_id", "many2one", "Company", relation="res.company"),
+    field("categ_id", "many2one", "Product Category", relation="product.category"),
     field("computed_total", "float", "Computed", store=False),
 ], is_report=True)
 

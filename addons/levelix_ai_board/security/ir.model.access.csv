@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_hint_user,levelix.ai.hint user,model_levelix_ai_hint,levelix_ai_core.group_ai_user,1,0,0,0
+access_ai_hint_admin,levelix.ai.hint admin,model_levelix_ai_hint,base.group_system,1,1,1,1

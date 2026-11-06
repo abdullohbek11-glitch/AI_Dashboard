@@ -6,7 +6,7 @@ from odoo.tests import tagged
 from odoo.tests.common import new_test_user
 
 from .fake_ai import GOOD_KEY
-from .test_engine import VENDORS, AiCase
+from .support import VENDORS, AiCase
 
 SECRET = "sk-settings-secret-424242"
 

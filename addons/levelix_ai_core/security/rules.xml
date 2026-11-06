@@ -17,6 +17,25 @@
         <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
     </record>
 
+    <record id="rule_ai_feedback_company" model="ir.rule">
+        <field name="name">AI feedback: own companies only</field>
+        <field name="model_id" ref="model_levelix_ai_feedback"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record id="rule_ai_feedback_own" model="ir.rule">
+        <field name="name">AI feedback: own</field>
+        <field name="model_id" ref="model_levelix_ai_feedback"/>
+        <field name="groups" eval="[(4, ref('group_ai_user'))]"/>
+        <field name="domain_force">[('user_id', '=', user.id)]</field>
+    </record>
+    <record id="rule_ai_feedback_audit" model="ir.rule">
+        <field name="name">AI feedback: administrators read all</field>
+        <field name="model_id" ref="model_levelix_ai_feedback"/>
+        <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+
     <!-- A user sees and keeps only his own conversations -->
     <record id="rule_ai_conversation_own" model="ir.rule">
         <field name="name">AI conversation: own</field>

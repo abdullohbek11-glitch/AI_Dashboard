@@ -19,6 +19,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 GOOD_KEY = "test-key"
 CONTEXT = re.compile(r"^\[context\][^\n]*\n\n", re.S)
+PREPARED = re.compile(r"\n\n\[prepared:.*", re.S)  # what the system looked up for the model: not what the user typed
+
+
+def typed(blocks):
+    """What the user typed in a message: no context line, no prepared block."""
+    return PREPARED.sub("", CONTEXT.sub("", "".join(b.get("text", "") for b in blocks if b["type"] == "text"))).strip().lower()
 
 
 # -- reading a vendor's request into one neutral shape -----------------------------------------------
@@ -97,18 +103,93 @@ def summarise(content):
     return "Done: " + content[:150]
 
 
+def turn_results(request):
+    """Tool results of the question being answered now (everything after the last typed user message)."""
+    found = []
+    for role, blocks in reversed(request["messages"]):
+        if role == "user" and any(b["type"] == "text" for b in blocks):
+            break
+        found = [b for b in blocks if b["type"] == "tool_result"] + found
+    return found
+
+
+def current_question(request):
+    for role, blocks in reversed(request["messages"]):
+        if role == "user" and any(b["type"] == "text" for b in blocks):
+            return typed(blocks)
+    return ""
+
+
+DRILL = {"action": "drill", "model": "sale.order", "columns": ["name", "partner_id", "date_order", "amount_total", "state"]}
+
+
+def sales_dashboard(variant):
+    """A dashboard spec as a careful model would write it for 'sales this month by day and the top 10 products'."""
+    state = [] if "cancelled" in variant else [["state", "=", "sale"]]
+    daily = {
+        "id": "w1", "type": "area", "title": "Daily sales", "view": {"smooth": True},
+        "data": {"source": "sale.report", "domain": state + [["date", ">=", "today =1d"]],
+                 "dimensions": [{"field": "date", "granularity": "day"}],
+                 "measures": [{"id": "m1", "field": "price_subtotal", "agg": "sum", "label": "Revenue"}],
+                 "order": {"by": "date", "dir": "asc"}, "fill_gaps": True},
+        "interact": {"on_click": dict(DRILL, map={"date": "date_order"})},
+    }
+    top = {
+        "id": "w2", "type": "bar", "title": "Top 10 products",
+        "data": {"source": "sale.report", "domain": state + [["date", ">=", "today =1d"]], "dimensions": [{"field": "product_id"}],
+                 "measures": [{"id": "m1", "field": "product_uom_qty", "agg": "sum", "label": "Quantity"}],
+                 "order": {"by": "m1", "dir": "desc"}, "limit": 10, "others": True},
+        "interact": {"on_click": dict(DRILL, map={"date": "date_order", "product_id": "order_line.product_id"})},
+    }
+    return {
+        "v": 1, "title": "Sales this month", "assumptions": ["Sales means confirmed orders.", "The date is the order date."],
+        "widgets": [daily, top],
+        "uncertain": [{"text": "Did you mean delivered quantities?",
+                       "patch": [{"op": "replace", "path": "/widgets/1/data/measures/0/field", "value": "qty_delivered"}]}],
+    }
+
+
+def dashboard_step(request, text):
+    """get_hints -> describe_model -> preview_widget -> build_dashboard, repairing when the server says so."""
+    results = turn_results(request)
+    if "mood" in text:  # nothing to build it from: say so
+        return say(request, "I have no data about mood, so I cannot build that dashboard. I can show sales, products or customers instead.")
+    if not results:
+        return call("get_hints", query="sales")
+    if len(results) == 1:
+        return call("describe_model", model="sale.report")
+    if len(results) == 2:
+        return call("preview_widget", widget=json.dumps(sales_dashboard("")["widgets"][1]))  # the top-products widget: its rows hold names
+    last = results[-1]["content"]
+    try:
+        outcome = json.loads(last)
+    except ValueError:
+        outcome = {}
+    broken = json.loads(json.dumps(sales_dashboard(text)))
+    broken["widgets"][0]["data"]["measures"][0]["field"] = "price_subtotl"  # the typo a model might make
+    if outcome.get("board_id"):  # build_dashboard succeeded (a preview also says ok, but has no board)
+        return say(request, "Your draft is ready: daily sales this month and the top 10 products.")
+    if outcome.get("give_up"):
+        return say(request, "I could not build this dashboard after several tries, so nothing was saved. Please ask again with a simpler request.")
+    if len(results) == 3:  # the first build_dashboard
+        return call("build_dashboard", spec=json.dumps(broken if ("repair" in text or "hopeless" in text) else sales_dashboard(text)))
+    return call("build_dashboard", spec=json.dumps(broken if "hopeless" in text else sales_dashboard(text)))  # a repair
+
+
 def decide(request):
     """The pretend AI's brain: a few canned intentions, enough to exercise every code path."""
     last_role, last_blocks = request["messages"][-1]
+    if "dashboard" in current_question(request):
+        return dashboard_step(request, current_question(request))
     results = [b for b in last_blocks if b["type"] == "tool_result"]
-    first = CONTEXT.sub("", "".join(b.get("text", "") for b in request["messages"][0][1] if b["type"] == "text")).strip().lower()
+    first = typed(request["messages"][0][1])
     if "loop" in first:
         return call("find_models", query="sales")  # never answers: tests the step limit
     if results:
         if results[0]["content"].startswith(("Error", "Access denied")):
             return say(request, "I could not read that: " + results[0]["content"][:120])
         return say(request, summarise(results[0]["content"]))
-    text = CONTEXT.sub("", "".join(b.get("text", "") for b in last_blocks if b["type"] == "text")).strip().lower()
+    text = typed(last_blocks)
     if "ping" == text:
         return say(request, "OK")
     if "how many sales orders" in text:
@@ -142,6 +223,7 @@ def stream_events(vendor, events, model):
     """Yield the SSE ``data:`` payloads (already JSON text) the vendor would send."""
     text_events = [v for k, v in events if k == "text"]
     tools = [v for k, v in events if k == "tool_use"]
+    cut = any(k == "cut" for k, _v in events)  # the vendor ran out of output room
     out = []
     if vendor == "anthropic":
         out.append({"type": "message_start", "message": {"usage": {"input_tokens": 11, "cache_read_input_tokens": 3}}})
@@ -159,7 +241,7 @@ def stream_events(vendor, events, model):
                 out.append({"type": "content_block_delta", "index": index, "delta": {"type": "input_json_delta", "partial_json": piece}})
             out.append({"type": "content_block_stop", "index": index})
             index += 1
-        out.append({"type": "message_delta", "delta": {"stop_reason": "tool_use" if tools else "end_turn"}, "usage": {"output_tokens": 7}})
+        out.append({"type": "message_delta", "delta": {"stop_reason": "max_tokens" if cut else "tool_use" if tools else "end_turn"}, "usage": {"output_tokens": 7}})
         out.append({"type": "message_stop"})
     elif vendor == "openai":
         for text in text_events:
@@ -175,14 +257,14 @@ def stream_events(vendor, events, model):
                     call_delta["function"]["name"] = tool["name"]
                     first = False
                 out.append({"choices": [{"index": 0, "delta": {"tool_calls": [call_delta]}}]})
-        out.append({"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls" if tools else "stop"}]})
+        out.append({"choices": [{"index": 0, "delta": {}, "finish_reason": "length" if cut else "tool_calls" if tools else "stop"}]})
         out.append({"choices": [], "usage": {"prompt_tokens": 11, "completion_tokens": 7, "prompt_tokens_details": {"cached_tokens": 3}}})
     else:
         for text in text_events:
             for piece in chunks(text):
                 out.append({"candidates": [{"content": {"role": "model", "parts": [{"text": piece}]}}]})
         parts = [{"functionCall": {"name": t["name"], "args": t["input"]}} for t in tools]
-        out.append({"candidates": [{"content": {"role": "model", "parts": parts or [{"text": ""}]}, "finishReason": "STOP"}],
+        out.append({"candidates": [{"content": {"role": "model", "parts": parts or [{"text": ""}]}, "finishReason": "MAX_TOKENS" if cut else "STOP"}],
                     "usageMetadata": {"promptTokenCount": 11, "candidatesTokenCount": 7, "cachedContentTokenCount": 3}})
     return [json.dumps(item) for item in out]
 

@@ -25,7 +25,12 @@ export function formatUnit(value, unit) {
 export const blocksRegistry = registry.category("levelix_ai_blocks");
 
 class BlockBase extends Component {
-    static props = { block: Object, onOpen: { type: Function, optional: true }, onChoose: { type: Function, optional: true } };
+    static props = {
+        block: Object,
+        onOpen: { type: Function, optional: true },
+        onChoose: { type: Function, optional: true },
+        onPrefill: { type: Function, optional: true },
+    };
     formatCell = formatCell;
     formatUnit = formatUnit;
 }

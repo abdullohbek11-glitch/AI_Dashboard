@@ -6,8 +6,7 @@
             <table class="lxb-sr-only">
                 <thead>
                     <tr>
-                        <th t-esc="props.frame.columns[0].label"/>
-                        <th t-foreach="model.series" t-as="series" t-key="series_index" t-esc="series.name"/>
+                        <th t-foreach="columnLabels" t-as="label" t-key="label_index" t-esc="label"/>
                     </tr>
                 </thead>
                 <tbody>

@@ -12,7 +12,7 @@ export class AiChat extends Component {
     setup() {
         this.chat = useService("levelix_ai.chat");
         this.state = useState(this.chat.state); // subscribes this component to the service's state
-        this.ui = useState({ draft: "" });
+        this.ui = useState({ draft: "", marking: 0, note: "" });
         this.scroller = useRef("scroller");
         this.input = useRef("input");
         onMounted(async () => {
@@ -70,9 +70,25 @@ export class AiChat extends Component {
         }
     }
 
+    /** A block asks to start the next question for the user (for example "Change the dashboard: "). */
+    prefill(text) {
+        this.ui.draft = text;
+        this.input.el?.focus();
+    }
+
     suggest(text) {
         this.ui.draft = text;
         this.submit();
+    }
+
+    startMarking(message) {
+        this.ui.marking = message.id;
+        this.ui.note = "";
+    }
+
+    async sendMark(message) {
+        await this.chat.markWrong(message, this.ui.note);
+        this.ui.marking = 0;
     }
 
     retry(index) {

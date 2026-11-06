@@ -84,6 +84,9 @@ class Dimension:
         gran = raw.get("granularity")
         if gran is not None:
             _expect(gran, str, path + ".granularity", "'granularity'")
+        name, _sep, tail = raw["field"].partition(":")
+        if tail and gran is None:  # {"field": "date:day_of_week"}: the chat's way of writing it means the same
+            return cls(name, tail)
         return cls(raw["field"], gran)
 
     def to_raw(self) -> dict:
@@ -101,6 +104,7 @@ class Measure:
     label: Optional[str] = None
     format: Optional[str] = None
     calc: Optional[str] = None
+    fixed: bool = False  # keeps its own money field when the dashboard's "Amounts" filter switches between untaxed and taxed
 
     @property
     def is_count(self) -> bool:
@@ -109,13 +113,14 @@ class Measure:
     @classmethod
     def from_raw(cls, raw, path: str) -> "Measure":
         _expect(raw, dict, path, "A measure")
-        _only_keys(raw, ("id", "field", "agg", "label", "format", "calc"), path)
+        _only_keys(raw, ("id", "field", "agg", "label", "format", "calc", "fixed"), path)
         for key in ("id", "field", "agg", "label", "format", "calc"):
             if raw.get(key) is not None:
                 _expect(raw[key], str, "%s.%s" % (path, key), "'%s'" % key)
+        _expect(raw.get("fixed", False), bool, path + ".fixed", "'fixed'")
         if not raw.get("id") or not _ID_RE.match(raw["id"]):
             _bad(path, "A measure needs an 'id' like 'm1' (lowercase letters, digits, underscore).")
-        measure = cls(raw["id"], raw.get("field"), raw.get("agg"), raw.get("label"), raw.get("format"), raw.get("calc"))
+        measure = cls(raw["id"], raw.get("field"), raw.get("agg"), raw.get("label"), raw.get("format"), raw.get("calc"), bool(raw.get("fixed", False)))
         if not (measure.field or measure.calc or measure.agg == "count"):
             _bad(path, "A measure needs a 'field' (or agg 'count', or a 'calc').")
         return measure
@@ -125,6 +130,8 @@ class Measure:
         for key in ("field", "agg", "label", "format", "calc"):
             if getattr(self, key) is not None:
                 raw[key] = getattr(self, key)
+        if self.fixed:
+            raw["fixed"] = True
         return raw
 
 

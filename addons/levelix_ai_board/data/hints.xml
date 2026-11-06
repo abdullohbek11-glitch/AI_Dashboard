@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Hints are written from the model's real fields, never from memory.
+         sale.report and account.invoice.report: checked against the running dev database (fields, selection values, date fields).
+         purchase.report and report.pos.order: checked against the Odoo 19 source (their apps are not installed in the dev database).
+         Note: the technical document calls the POS report "pos.order.report"; in Odoo 19 it is "report.pos.order". -->
+    <record id="hint_sales" model="levelix.ai.hint">
+        <field name="name">Sales</field>
+        <field name="sequence">10</field>
+        <field name="keywords">sales, sale, selling, revenue, turnover, orders, order, customers, sotuv, savdo, buyurtma, daromad, mijoz, продажи, продажа, выручка, заказ, заказы, клиенты</field>
+        <field name="model">sale.report</field>
+        <field name="advice">Reporting model for sales: use it for revenue, quantities and order counts (amounts are already in the company currency).
+Confirmed orders: ["state","=","sale"] (Odoo 19 has no "done" state; locked orders stay "sale"). State values: draft (quotation), sent, sale, cancel. Without a state condition quotations and cancelled orders are counted too.
+Date: "date" (order date, a datetime).
+Measures: price_subtotal (untaxed revenue), price_total (with tax), product_uom_qty (ordered), qty_delivered, qty_invoiced, discount_amount. Count orders: field "name" with agg count_distinct.
+Revenue ("sales", "turnover", "revenue"): use ONE measure per widget (price_subtotal, labelled plainly, for example "Revenue") and add the dashboard filter {"id":"amounts","type":"amount_basis","label":"Amounts","default":"untaxed","applies_to":{"sale.report":{"untaxed":"price_subtotal","taxed":"price_total"}}}: the reader switches between amounts without tax and with tax and every widget follows. Rank top lists by that measure. Show both money fields side by side only when the user asks (give the second measure "fixed": true).
+Group by: product_id, product_tmpl_id, categ_id (product category), partner_id (customer), user_id (salesperson), team_id, country_id, date with a granularity.
+To open the orders behind a chart point (interact.on_click, action drill, model "sale.order"): map {"date":"date_order","product_id":"order_line.product_id","product_tmpl_id":"order_line.product_template_id"}; partner_id, user_id and state need no mapping. Columns: name, partner_id, date_order, amount_total, state.</field>
+    </record>
+    <record id="hint_invoices" model="levelix.ai.hint">
+        <field name="name">Invoices</field>
+        <field name="sequence">20</field>
+        <field name="keywords">invoice, invoices, invoiced, billing, bills, receivable, receivables, unpaid, paid, faktura, hisob-faktura, to'lov, qarz, счет, счёт, счета, фактура, оплата, долг</field>
+        <field name="model">account.invoice.report</field>
+        <field name="advice">Reporting model for invoice lines (amounts in the company currency; credit notes are negative).
+Posted documents: ["state","=","posted"] (state values: draft, posted, cancel).
+Type: move_type = out_invoice (customer invoice), out_refund (customer credit note), in_invoice (vendor bill), in_refund (vendor credit note).
+Payment: payment_state (not_paid, in_payment, paid, partial, reversed, blocked).
+Date: invoice_date (a date); invoice_date_due is the due date.
+Measures: price_subtotal (untaxed), price_total (with tax), quantity. Count documents: field "move_id" with agg count_distinct.
+Invoiced amount: use ONE measure per widget (price_subtotal, labelled plainly, for example "Revenue") and add the dashboard filter {"id":"amounts","type":"amount_basis","label":"Amounts","default":"untaxed","applies_to":{"account.invoice.report":{"untaxed":"price_subtotal","taxed":"price_total"}}}: the reader switches between amounts without tax and with tax and every widget follows. Rank top lists by that measure. Show both money fields side by side only when the user asks (give the second measure "fixed": true).
+Group by: partner_id, invoice_user_id (salesperson), product_id, product_categ_id, team_id, invoice_date with a granularity.
+To open the invoices behind a chart point: model "account.move", map {"invoice_date":"invoice_date","partner_id":"partner_id","invoice_user_id":"invoice_user_id"}, columns name, partner_id, invoice_date, amount_total, state.</field>
+    </record>
+    <record id="hint_purchases" model="levelix.ai.hint">
+        <field name="name">Purchases</field>
+        <field name="sequence">30</field>
+        <field name="keywords">purchase, purchases, vendor, vendors, supplier, suppliers, procurement, spend, xarid, sotib olish, yetkazib beruvchi, закупка, закупки, поставщик, поставщики</field>
+        <field name="model">purchase.report</field>
+        <field name="advice">Reporting model for purchases (amounts are converted to the company currency).
+Confirmed purchase orders: ["state","=","purchase"] (state values: draft, sent, to approve, purchase, cancel; there is no "done" state).
+Date: date_order (order date); date_approve is the confirmation date.
+Measures: untaxed_total, price_total, qty_ordered, qty_received, qty_billed. Count orders: field "order_id" with agg count_distinct if describe_model lists it.
+Spend: use ONE measure per widget (untaxed_total, labelled plainly, for example "Revenue") and add the dashboard filter {"id":"amounts","type":"amount_basis","label":"Amounts","default":"untaxed","applies_to":{"purchase.report":{"untaxed":"untaxed_total","taxed":"price_total"}}}: the reader switches between amounts without tax and with tax and every widget follows. Rank top lists by that measure. Show both money fields side by side only when the user asks (give the second measure "fixed": true).
+Group by: partner_id (vendor), product_id, date_order with a granularity.</field>
+    </record>
+    <record id="hint_pos" model="levelix.ai.hint">
+        <field name="name">Point of sale</field>
+        <field name="sequence">40</field>
+        <field name="keywords">pos, point of sale, cash register, cashier, receipt, receipts, retail, kassa, kassir, чек, чеки, касса, кассир</field>
+        <field name="model">report.pos.order</field>
+        <field name="advice">Reporting model for point-of-sale orders.
+Finished sales: ["state","in",["paid","done"]] ("done" means posted; state values: draft = new and unpaid, paid, done, cancel).
+Date: "date" (a datetime).
+Measures: price_total, price_subtotal_excl (without tax), product_qty, nbr_lines. Count receipts: field "order_id" with agg count_distinct.
+Takings: use ONE measure per widget (price_subtotal_excl, labelled plainly, for example "Revenue") and add the dashboard filter {"id":"amounts","type":"amount_basis","label":"Amounts","default":"untaxed","applies_to":{"report.pos.order":{"untaxed":"price_subtotal_excl","taxed":"price_total"}}}: the reader switches between amounts without tax and with tax and every widget follows. Rank top lists by that measure. Show both money fields side by side only when the user asks (give the second measure "fixed": true).
+Group by: product_id, user_id (cashier), date with a granularity.</field>
+    </record>
+</odoo>

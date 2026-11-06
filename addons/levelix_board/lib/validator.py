@@ -6,18 +6,26 @@ self-repair loop feeds these messages straight back to the model.
 """
 import difflib
 
+from . import board_filters
+from . import calc as calc_lib
+from . import compare as compare_lib
 from . import domain as domain_lib
 from . import drill as drill_lib
 from . import filters
 from .catalog import NUMERIC_TYPES, TEMPORAL_TYPES, Catalog, ModelInfo
 from .errors import BoardError, BoardWarning, ValidationResult
 from .i18n import t
+from .patch import apply_patch
 from .spec import (
     AGGREGATES, DATE_PARTS, GRANULARITIES, MAX_SPEC_BYTES, MAX_WIDGETS, MEASURE_FORMATS,
     SHAPES, TIME_AXIS_TYPES, Data, Spec, Widget,
 )
 
 MAX_DIMENSIONS = 2
+MAX_ASSUMPTIONS = 10
+MAX_ASSUMPTION_CHARS = 200
+MAX_UNCERTAIN = 5
+MAX_UNCERTAIN_TEXT = 160
 MAX_MEASURES = 4
 MAX_LIMIT = 500
 DOMAIN_OPERATORS = (
@@ -30,6 +38,14 @@ PATTERN_OPERATORS = ("like", "not like", "ilike", "not ilike", "=like", "=ilike"
 SCALAR_TYPES = (str, int, float, bool, type(None))
 ADDITIVE_AGGREGATES = ("sum", "count")
 HOUR_PARTS = ("hour_number", "minute_number", "second_number")
+COMPARE_TYPES = ("kpi", "line", "area")
+# the keys each widget type reads from "view" (a misspelt one would be ignored silently, so it is an error)
+VIEW_KEYS = {
+    "kpi": (), "line": ("smooth",), "area": ("smooth", "stacked"), "bar": ("orientation", "stacked"), "pie": ("donut",),
+    "table": (), "heatmap": (), "funnel": (), "treemap": (), "gauge": ("target",), "waterfall": (), "scatter": (),
+    "combo": ("line",),
+}
+BOOLEAN_VIEW_KEYS = ("smooth", "stacked", "donut")
 LOG_DATES = ("create_date", "write_date")
 
 
@@ -75,24 +91,61 @@ class Validator:
 
     # -- entry points -------------------------------------------------------
 
-    def validate_spec(self, spec: Spec) -> ValidationResult:
+    def validate_spec(self, spec: Spec, check_uncertain: bool = True) -> ValidationResult:
         result = ValidationResult([], [])
         if len(spec.widgets) > MAX_WIDGETS:
             result.errors.append(BoardError("SPEC_TOO_LARGE", "widgets", "At most %d widgets are allowed." % MAX_WIDGETS))
         if spec.size_bytes() > MAX_SPEC_BYTES:
             result.errors.append(BoardError("SPEC_TOO_LARGE", "", "The spec is larger than %d KB." % (MAX_SPEC_BYTES // 1024)))
+        filter_errors = board_filters.check(list(spec.filters), self.catalog)
         seen = set()
         for index, widget in enumerate(spec.widgets):
             path = "widgets[%d]" % index
             if widget.id in seen:
                 result.errors.append(BoardError("DUPLICATE_ID", path + ".id", "Widget id '%s' is used twice." % widget.id))
             seen.add(widget.id)
-            sub = self.validate_widget(widget, path)
+            sub = self.validate_widget(widget, path, spec.filters if not filter_errors else ())  # a broken filter is reported once, not once per widget
             result.errors += sub.errors
             result.warnings += sub.warnings
+        result.errors += filter_errors
+        self._check_notes(spec, result)
+        if check_uncertain and not result.errors:
+            self._check_uncertain(spec, result)
         return result
 
-    def validate_widget(self, widget: Widget, path: str = "widget") -> ValidationResult:
+    def _check_notes(self, spec: Spec, result: ValidationResult):
+        """assumptions are short sentences; uncertain items are {text, patch} with a readable text."""
+        if len(spec.assumptions) > MAX_ASSUMPTIONS or not all(isinstance(a, str) and 0 < len(a) <= MAX_ASSUMPTION_CHARS for a in spec.assumptions):
+            result.errors.append(BoardError("BAD_SPEC", "assumptions", "'assumptions' is a list of up to %d short sentences (each up to %d characters)." % (MAX_ASSUMPTIONS, MAX_ASSUMPTION_CHARS)))
+        if len(spec.uncertain) > MAX_UNCERTAIN:
+            result.errors.append(BoardError("BAD_SPEC", "uncertain", "At most %d 'uncertain' items are allowed." % MAX_UNCERTAIN))
+        for index, item in enumerate(spec.uncertain[:MAX_UNCERTAIN]):
+            path = "uncertain[%d]" % index
+            if not isinstance(item, dict) or set(item) - {"text", "patch"}:
+                result.errors.append(BoardError("BAD_SPEC", path, "An 'uncertain' item is {text, patch}."))
+            elif not isinstance(item.get("text"), str) or not 0 < len(item["text"]) <= MAX_UNCERTAIN_TEXT:
+                result.errors.append(BoardError("BAD_SPEC", path + ".text", "The text is a sentence of up to %d characters." % MAX_UNCERTAIN_TEXT))
+
+    def _check_uncertain(self, spec: Spec, result: ValidationResult):
+        """A button the user may press must not be able to break the dashboard: its patch is tried on a copy."""
+        raw = spec.to_raw()
+        for index, item in enumerate(spec.uncertain[:MAX_UNCERTAIN]):
+            path = "uncertain[%d].patch" % index
+            if not isinstance(item.get("patch"), list):
+                result.errors.append(BoardError("BAD_SPEC", path, "'patch' is a list of operations."))
+                continue
+            try:
+                patched = Spec.from_raw(apply_patch(raw, item["patch"]))
+            except BoardError as error:
+                result.errors.append(BoardError(error.code, path, error.detail))
+                continue
+            problems = self.validate_spec(patched, check_uncertain=False).errors
+            if problems:
+                result.errors.append(BoardError(
+                    "UNCERTAIN_PATCH_INVALID", path, "Pressing this option would break the dashboard: %s: %s" % (problems[0].path, problems[0].detail)))
+
+    def validate_widget(self, widget: Widget, path: str = "widget", filters=()) -> ValidationResult:
+        """``filters``: the dashboard's filters; a period filter on the widget's model supplies the start date of a comparison."""
         result = ValidationResult([], [])
         err = lambda code, sub, message: result.errors.append(BoardError(code, "%s%s" % (path, sub), message))  # noqa: E731
         data = widget.data
@@ -110,18 +163,32 @@ class Validator:
 
         self._check_domain(data, model, path, result)
         dim_fields = self._check_dimensions(data, model, path, result)
-        measure_ids = self._check_measures(data, model, path, result)
-        self._check_order(data, model, measure_ids, path, result)
+        measure_ids, calc_ids = self._check_measures(data, model, path, result)
+        self._check_order(data, model, measure_ids, calc_ids, path, result)
         self._check_limit_others(data, model, path, result)
-        self._check_having(data, measure_ids, path, result)
+        self._check_having(data, measure_ids, calc_ids, path, result)
         if widget.type in SHAPES:
             self._check_shape(widget, dim_fields, path, result)
+            self._check_view(widget, path, result)
         if data.compare is not None:
-            err("UNSUPPORTED", dpath + ".compare", "'compare' is not available yet.")
+            self._check_compare(widget, dim_fields, path, result)
         result.errors += drill_lib.check(widget, model, self.catalog, path)
+        if not result.errors and filters:
+            self._check_basis_variants(widget, path, filters, result)
         if not result.errors:
-            self._warnings(data, model, path, result)
+            self._warnings(data, model, path, result, filters)
         return result
+
+    def _check_basis_variants(self, widget: Widget, path: str, filters, result: ValidationResult):
+        """With an "Amounts" filter the widget runs once per basis: both versions must be valid."""
+        known = {(e.code, e.path) for e in result.errors}
+        for basis in board_filters.BASES:
+            swapped = board_filters.swap_measures(widget, board_filters.basis_mapping(filters, widget.data.source, basis))
+            if swapped is widget:
+                continue
+            for error in self.validate_widget(swapped, path, ()).errors:
+                if (error.code, error.path) not in known:
+                    result.errors.append(BoardError(error.code, error.path, "With the Amounts filter on '%s': %s" % (basis, error.detail)))
 
     # -- parts --------------------------------------------------------------
 
@@ -243,8 +310,11 @@ class Validator:
                     result.errors.append(BoardError("BAD_GRANULARITY", dpath, "'%s' has no time of day." % field.label))
         return fields
 
-    def _check_measures(self, data: Data, model: ModelInfo, path: str, result: ValidationResult) -> set:
-        ids = set()
+    def _check_measures(self, data: Data, model: ModelInfo, path: str, result: ValidationResult) -> tuple:
+        """``(all measure ids, ids of calculated measures)``."""
+        ids, calcs = set(), set()
+        if data.measures and all(m.calc is not None for m in data.measures):
+            result.errors.append(BoardError("BAD_CALC", path + ".data.measures", "A widget needs at least one measure read from the data; a formula only combines them."))
         if len(data.measures) > MAX_MEASURES:
             result.errors.append(BoardError("BAD_SHAPE", path + ".data.measures", "At most %d measures are allowed." % MAX_MEASURES))
         for index, measure in enumerate(data.measures):
@@ -259,7 +329,8 @@ class Validator:
                 err("NOT_AGGREGATABLE", "Unknown aggregate '%s'. Allowed: %s." % (measure.agg, ", ".join(AGGREGATES)))
                 continue
             if measure.calc is not None:
-                err("UNSUPPORTED", "Calculated measures are not available yet.")
+                calcs.add(measure.id)
+                self._check_calc(measure, data, mpath, result)
                 continue
             if measure.is_count:
                 continue
@@ -279,9 +350,28 @@ class Validator:
                 what = "summed" if agg in (None, "sum") else "used with '%s'" % agg
                 tail = " Allowed: %s." % ", ".join(allowed) if allowed else " It can only be used in a count."
                 err("NOT_AGGREGATABLE", "Field '%s' cannot be %s.%s" % (field.name, what, tail))
-        return ids
+        return ids, calcs
 
-    def _check_order(self, data, model, measure_ids, path, result):
+    def _check_calc(self, measure, data: Data, mpath: str, result: ValidationResult):
+        """A calculated measure is arithmetic over the other (queried) measures of the widget."""
+        err = lambda code, message: result.errors.append(BoardError(code, mpath, message))  # noqa: E731
+        if measure.field is not None or measure.agg is not None:
+            err("BAD_CALC", "A calculated measure has only 'id', 'calc', 'label' and 'format'; it has no 'field' or 'agg' of its own.")
+            return
+        try:
+            tree = calc_lib.parse(measure.calc)
+        except calc_lib.CalcError as error:
+            err("BAD_CALC", "Cannot read the formula '%s': %s (at character %d). Use measure ids, numbers, + - * / and parentheses." % (measure.calc, error, error.position))
+            return
+        queried = {m.id for m in data.measures if m.calc is None}
+        for name in sorted(calc_lib.names(tree)):
+            if name == measure.id:
+                err("BAD_CALC", "A calculated measure cannot use itself ('%s')." % name)
+            elif name not in queried:
+                others = sorted(queried)
+                err("UNKNOWN_MEASURE", "The formula uses '%s', which is not a measure of this widget (ones a formula may use: %s)." % (name, ", ".join(others) or "none"))
+
+    def _check_order(self, data, model, measure_ids, calc_ids, path, result):
         if data.order is None:
             return
         opath = path + ".data.order"
@@ -292,6 +382,9 @@ class Validator:
         if direction not in ("asc", "desc"):
             result.errors.append(BoardError("BAD_ORDER", opath, "'dir' must be 'asc' or 'desc'."))
         dim_names = {d.field for d in data.dimensions} | {d.key for d in data.dimensions}
+        if by in calc_ids:
+            result.errors.append(BoardError("BAD_ORDER", opath, "Cannot order by '%s': it is a calculated measure. Order by a measure that is read from the data." % by))
+            return
         if by not in measure_ids and by not in dim_names:
             options = sorted(measure_ids | {d.field for d in data.dimensions})
             result.errors.append(BoardError("BAD_ORDER", opath, "Cannot order by '%s'. Use a measure id or a dimension: %s." % (by, ", ".join(options) or "-")))
@@ -317,7 +410,7 @@ class Validator:
                         "NON_ADDITIVE_OTHERS", "%s.measures[%d]" % (lpath, index),
                         "'Others' is only correct for sums and counts; '%s' of '%s' cannot be added up." % (agg, measure.field)))
 
-    def _check_having(self, data: Data, measure_ids, path, result):
+    def _check_having(self, data: Data, measure_ids, calc_ids, path, result):
         for index, item in enumerate(data.having):
             hpath = "%s.data.having[%d]" % (path, index)
             if not (isinstance(item, (list, tuple)) and len(item) == 3):
@@ -327,7 +420,9 @@ class Validator:
             if not isinstance(mid, str) or not isinstance(op, str):
                 result.errors.append(BoardError("BAD_HAVING", hpath, "A 'having' condition looks like [measure_id, operator, number]."))
                 continue
-            if mid not in measure_ids:
+            if mid in calc_ids:
+                result.errors.append(BoardError("BAD_HAVING", hpath, "'having' cannot use '%s': it is a calculated measure." % mid))
+            elif mid not in measure_ids:
                 result.errors.append(BoardError("UNKNOWN_MEASURE", hpath, "No measure with id '%s'." % mid))
             if op not in HAVING_OPERATORS:
                 result.errors.append(BoardError("BAD_HAVING", hpath, "Operator '%s' is not allowed here." % op))
@@ -347,6 +442,14 @@ class Validator:
             result.errors.append(BoardError("BAD_SHAPE", spath + ".dimensions[0]", "A '%s' widget needs a date as its first dimension." % widget.type))
         if widget.type == "pie" and data.limit is not None and data.limit > 8:
             result.errors.append(BoardError("BAD_SHAPE", spath + ".limit", "A pie chart shows at most 8 slices."))
+        if widget.type == "pie":  # slices must add up to a whole
+            for index, measure in enumerate(data.measures):
+                field = self._model_field(data, measure)
+                agg = "count" if measure.is_count else measure.agg or (field.aggregator if field else None)
+                if measure.calc is not None or agg not in ADDITIVE_AGGREGATES:
+                    result.errors.append(BoardError(
+                        "BAD_SHAPE", "%s.measures[%d]" % (spath, index),
+                        "A pie chart shows shares of a whole, so its measure must be a total or a count (sum or count), not '%s'." % (agg or "calc")))
         if widget.type == "gauge":
             target = widget.view.get("target")
             if isinstance(target, bool) or not isinstance(target, (int, float)):
@@ -359,7 +462,51 @@ class Validator:
             elif data.order and data.order.get("by") not in (dim.field, dim.key):
                 result.errors.append(BoardError("BAD_SHAPE", spath + ".fill_gaps", "'fill_gaps' needs the rows ordered by the date axis."))
 
-    def _warnings(self, data: Data, model: ModelInfo, path: str, result: ValidationResult):
+    def _model_field(self, data: Data, measure):
+        model = self.catalog.model(data.source)
+        return model.field((measure.field or "").split(".")[0]) if model else None
+
+    def _check_view(self, widget: Widget, path: str, result: ValidationResult):
+        """Only the keys the widget type reads; each with a value of the right kind."""
+        view, vpath = widget.view, path + ".view"
+        allowed = VIEW_KEYS.get(widget.type, ())
+        for key in view:
+            if key not in allowed:
+                what = "Allowed: %s." % ", ".join(allowed) if allowed else "A '%s' widget has no view options." % widget.type
+                result.errors.append(BoardError("UNKNOWN_KEY", vpath, "Unknown key '%s' in 'view'. %s" % (key, what)))
+                continue
+            value = view[key]
+            if key in BOOLEAN_VIEW_KEYS and not isinstance(value, bool):
+                result.errors.append(BoardError("BAD_VIEW", "%s.%s" % (vpath, key), "'%s' is true or false." % key))
+            elif key == "orientation" and value not in ("horizontal", "vertical"):
+                result.errors.append(BoardError("BAD_VIEW", vpath + ".orientation", "'orientation' is 'horizontal' or 'vertical'."))
+            elif key == "line" and value not in {m.id for m in widget.data.measures}:
+                ids = ", ".join(m.id for m in widget.data.measures)
+                result.errors.append(BoardError("BAD_VIEW", vpath + ".line", "'line' names the measure drawn as a line; use one of: %s." % ids))
+
+    def _check_compare(self, widget: Widget, dim_fields: list, path: str, result: ValidationResult):
+        data, cpath = widget.data, path + ".data.compare"
+        err = lambda code, message, where=cpath: result.errors.append(BoardError(code, where, message))  # noqa: E731
+        if data.compare not in compare_lib.KINDS:
+            err("BAD_COMPARE", "'compare' is one of: %s." % ", ".join(compare_lib.KINDS))
+            return
+        if widget.type not in COMPARE_TYPES:
+            err("BAD_SHAPE", "A comparison is shown by kpi, line and area widgets, not '%s'." % widget.type)
+        if len(data.dimensions) > 1:
+            err("BAD_SHAPE", "A comparison works with a date axis or none at all, not with two dimensions.")
+            return
+        if any(not domain_lib.is_leaf(item) for item in data.domain):
+            err("COMPARE_NO_PERIOD", "A comparison needs a plain list of conditions in 'domain' (no OR / NOT), so the period can be moved back.")
+        if data.dimensions:
+            dim, field = data.dimensions[0], dim_fields[0] if dim_fields else None
+            if field is None:
+                return
+            if "." in dim.field or not field.is_temporal or dim.granularity not in GRANULARITIES + (None,):
+                err("BAD_SHAPE", "A comparison needs the first dimension to be a date of the widget's own model, grouped by day, week, month, quarter or year.", path + ".data.dimensions[0]")
+            elif not data.fill_gaps:
+                err("BAD_SHAPE", "A comparison over a date axis needs 'fill_gaps': true, so both periods line up bucket by bucket.", path + ".data.fill_gaps")
+
+    def _warnings(self, data: Data, model: ModelInfo, path: str, result: ValidationResult, filters=()):
         wpath = path + ".data"
         nodes = domain_lib.parse(data.domain)
         used = {leaf[0].split(".")[0] for leaf in domain_lib.leaves(nodes)}
@@ -368,12 +515,30 @@ class Validator:
             result.warnings.append(BoardWarning(
                 "STATE_FILTER_MISSING", wpath + ".domain",
                 t("There is no filter on '%s', so every status is counted (for example cancelled records).") % state.label))
+        if data.compare in compare_lib.KINDS and not self._has_period_start(data, model, filters):
+            result.warnings.append(BoardWarning(
+                "COMPARE_NO_PERIOD", wpath + ".compare",
+                t("The comparison needs a start date in the filters (for example Order Date at or after the first of the month); without one it is not shown.")))
         log_used = [d.field for d in data.dimensions if d.field in LOG_DATES] + [n for n in used if n in LOG_DATES]
         other_dates = [f for f in model.fields.values() if f.is_temporal and f.store and f.name not in LOG_DATES]
         if log_used and other_dates:
             result.warnings.append(BoardWarning(
                 "SUSPICIOUS_DATE", wpath,
                 t("The date used is when the record was created in the system, not a business date. '%s' may be what you mean.") % other_dates[0].label))
+
+
+    @staticmethod
+    def _has_period_start(data: Data, model: ModelInfo, filters=()) -> bool:
+        wanted = {data.dimensions[0].field} if data.dimensions else None
+        for item in filters:  # a dashboard period on this model (and this axis) supplies the dates
+            if isinstance(item, dict) and item.get("type") == "date_range" and (item.get("applies_to") or {}).get(data.source) \
+                    and (wanted is None or item["applies_to"][data.source] in wanted):
+                return True
+        for name, op, _value in domain_lib.leaves(domain_lib.parse(data.domain)):
+            field = model.field(name)
+            if field is not None and field.is_temporal and op in (">=", ">", "=") and (wanted is None or name in wanted):
+                return True
+        return False
 
 
 def _range(low: int, high: int) -> str:

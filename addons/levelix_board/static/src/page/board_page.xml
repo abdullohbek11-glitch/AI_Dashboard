@@ -21,6 +21,43 @@
                 </div>
             </header>
 
+            <div t-if="state.view === 'board' and !state.error" class="lxb-actions" role="toolbar" aria-label="Dashboard actions">
+                <t t-if="!editing">
+                    <button t-if="state.board.state === 'draft' and canEdit" class="lxb-btn lxb-btn--primary" t-att-disabled="state.busy" t-on-click="keep">Keep</button>
+                    <button t-if="canEditHere" class="lxb-btn" data-action="edit" t-on-click="() => editor.start()">Edit</button>
+                    <button t-if="canEdit and canAskAi" class="lxb-btn" data-action="ask-ai" t-on-click="askAi">Change with AI</button>
+                    <button t-if="canEdit" class="lxb-btn" data-action="history" t-on-click="() => state.panel = 'history'">History</button>
+                    <button t-if="canEdit" class="lxb-btn" data-action="share" t-on-click="() => state.panel = 'share'">Share: <t t-esc="shareLabel"/></button>
+                    <button class="lxb-btn" data-action="copy" t-att-disabled="state.busy" t-on-click="copy">Make my own copy</button>
+                    <button class="lxb-btn" data-action="export" t-att-disabled="state.busy" t-on-click="exportPng">Export PNG</button>
+                    <button t-if="canEdit" class="lxb-btn lxb-btn--ghost" data-action="archive" t-on-click="() => state.confirm = 'archive'">Archive</button>
+                </t>
+                <t t-else="">
+                    <button class="lxb-btn" data-action="add" t-on-click="() => state.edit.adding = true">Add a widget</button>
+                    <button class="lxb-btn lxb-btn--primary" data-action="save" t-att-disabled="!state.edit.dirty or state.edit.saving" t-on-click="() => editor.save()">Save</button>
+                    <button class="lxb-btn lxb-btn--ghost" data-action="cancel" t-on-click="() => editor.cancel()">Cancel</button>
+                    <span t-if="state.edit.dirty" class="lxb-note">Unsaved changes</span>
+                </t>
+            </div>
+            <div t-if="state.confirm === 'archive'" class="lxb-banner" role="alertdialog">
+                <span>Archive this dashboard? It disappears from the lists; an administrator can bring it back.</span>
+                <button class="lxb-btn lxb-btn--primary" t-att-disabled="state.busy" t-on-click="archive">Yes, archive</button>
+                <button class="lxb-btn lxb-btn--ghost" t-on-click="() => state.confirm = ''">No</button>
+            </div>
+            <div t-if="state.edit and state.edit.confirmCancel" class="lxb-banner" role="alertdialog">
+                <span>Discard your changes?</span>
+                <button class="lxb-btn lxb-btn--primary" t-on-click="() => editor.cancel(true)">Yes, discard</button>
+                <button class="lxb-btn lxb-btn--ghost" t-on-click="() => state.edit.confirmCancel = false">Keep editing</button>
+            </div>
+            <div t-if="state.edit and state.edit.error" class="lxb-banner lxb-banner--error" role="alert" data-banner="edit-error">
+                <span t-esc="state.edit.error"/>
+                <button t-if="state.edit.stale" class="lxb-btn lxb-btn--primary" t-on-click="() => editor.reload()">Reload the dashboard</button>
+            </div>
+            <div t-if="state.notice" class="lxb-banner" role="status">
+                <span t-esc="state.notice"/>
+                <button class="lxb-btn lxb-btn--ghost" t-on-click="() => state.notice = ''">OK</button>
+            </div>
+
             <div t-if="state.error" class="lxb-state lxb-state--error lxb-page-state" role="alert">
                 <div class="lxb-state__title">Something went wrong</div>
                 <div class="lxb-state__text" t-esc="state.error"/>
@@ -50,17 +87,77 @@
             </t>
 
             <t t-else="">
-                <div t-if="!state.board.spec.widgets.length" class="lxb-state lxb-page-state">
+                <div class="lxb-sheet" t-ref="sheet">
+                <div class="lxb-sheet__title" t-esc="state.board.spec.title or state.board.name"/>
+                <div t-if="filters.length" class="lxb-filters" role="group" aria-label="Dashboard filters">
+                    <t t-foreach="filters" t-as="filter" t-key="filter.id">
+                        <div class="lxb-filter" t-att-data-filter-id="filter.id">
+                            <span class="lxb-filter__label" t-esc="filter.label"/>
+                            <t t-if="filter.type === 'date_range'">
+                                <select class="lxb-select" t-att-aria-label="filter.label" t-on-change="(ev) => this.setPeriod(filter, ev.target.value)">
+                                    <option t-foreach="presets" t-as="preset" t-key="preset.value" t-att-value="preset.value"
+                                            t-att-selected="periodChoice(filter) === preset.value" t-esc="preset.label"/>
+                                    <option value="custom" t-att-selected="periodChoice(filter) === 'custom'">Custom range…</option>
+                                </select>
+                                <t t-if="periodChoice(filter) === 'custom'">
+                                    <input type="date" class="lxb-select" aria-label="From" t-att-value="state.custom[filter.id].from or ''" t-on-change="(ev) => this.setCustom(filter, 'from', ev.target.value)"/>
+                                    <span class="lxb-filter__dash">–</span>
+                                    <input type="date" class="lxb-select" aria-label="To" t-att-value="state.custom[filter.id].to or ''" t-on-change="(ev) => this.setCustom(filter, 'to', ev.target.value)"/>
+                                </t>
+                            </t>
+                            <t t-elif="filter.type === 'amount_basis'">
+                                <div class="lxb-segment" role="radiogroup" t-att-aria-label="filter.label">
+                                    <button t-foreach="bases" t-as="basis" t-key="basis.value" type="button" role="radio"
+                                            t-att-aria-checked="state.filters[filter.id] === basis.value ? 'true' : 'false'"
+                                            t-attf-class="lxb-segment__btn {{state.filters[filter.id] === basis.value ? 'lxb-segment__btn--on' : ''}}"
+                                            t-on-click="() => this.setBasis(filter, basis.value)" t-esc="basis.label"/>
+                                </div>
+                            </t>
+                            <t t-elif="filter.type === 'company'">
+                                <label t-foreach="state.options[filter.id] or []" t-as="option" t-key="option.value" class="lxb-toggle">
+                                    <input type="checkbox" t-att-checked="isCompanyOn(filter, option.value)" t-on-change="() => this.toggleCompany(filter, option.value)"/>
+                                    <span t-esc="option.label"/>
+                                </label>
+                            </t>
+                            <t t-else="">
+                                <select class="lxb-select" t-att-aria-label="filter.label" t-on-change="(ev) => this.setChoice(filter, ev.target.selectedIndex - 1)">
+                                    <option value="" t-att-selected="chosenIndex(filter) === -1">All</option>
+                                    <option t-foreach="state.options[filter.id] or []" t-as="option" t-key="option_index" t-att-value="option_index"
+                                            t-att-selected="chosenIndex(filter) === option_index" t-esc="option.label"/>
+                                </select>
+                            </t>
+                        </div>
+                    </t>
+                </div>
+                <div t-if="state.cross" class="lxb-cross" role="status">
+                    <span>Filtered by <strong t-esc="state.cross.title"/>: <t t-esc="state.cross.label"/></span>
+                    <button class="lxb-btn lxb-btn--ghost" t-on-click="clearCross">Clear ✕</button>
+                </div>
+                <div t-if="!shownSpec.widgets.length" class="lxb-state lxb-page-state">
                     <div class="lxb-state__title">This dashboard has no widgets</div>
                 </div>
-                <div t-else="" class="lxb-grid">
-                    <BoardWidget t-foreach="cells" t-as="cell" t-key="cell.widget.id"
+                <div t-else="" t-attf-class="lxb-grid {{editing ? 'lxb-grid--editing' : ''}}" t-ref="grid">
+                    <BoardWidget t-foreach="cells" t-as="cell" t-key="cell.widget.id + ':' + cell.widget.type"
                                  boardId="state.board.id" widget="cell.widget" reloadKey="state.reloadKey"
+                                 filters="state.filters" cross="crossRequest"
+                                 editing="editing" draft="isDraft(cell.widget)" types="editing ? typesFor(cell.widget) : []"
                                  onDrill="(request) => this.openDrill(request)"
+                                 onCross="(request) => this.toggleCross(request)"
+                                 onDragStart="(ev, id, kind) => editor.dragStart(ev, id, kind)"
+                                 onRename="(id, value) => editor.rename(id, value)"
+                                 onRetype="(id, type) => editor.retype(id, type)"
+                                 onRemove="(id) => editor.remove(id)"
                                  style="cell.style"/>
+                </div>
                 </div>
             </t>
 
+            <AddWidgetDialog t-if="state.edit and state.edit.adding and state.edit.meta" shapes="state.edit.meta.shapes"
+                             nextId="() => editor.nextId()" onAdd="(widget) => editor.add(widget)" onClose="() => state.edit.adding = false"/>
+            <HistoryPanel t-if="state.panel === 'history'" boardId="state.board.id" version="state.board.version"
+                          onClose="() => this.closePanel()" onRestored="() => this.onRestored()"/>
+            <AiChatDialog t-if="state.panel === 'ai'" chats="state.aiChats" onPick="(chat) => this.pickChat(chat)" onClose="() => this.closePanel()"/>
+            <ShareDialog t-if="state.panel === 'share'" board="state.board" onClose="() => this.closePanel()" onSaved="(card) => this.onShared(card)"/>
             <DrillPanel t-if="state.drill" t-key="state.drill.key"
                         boardId="state.board.id" request="state.drill" onClose="() => state.drill = null"/>
         </div>

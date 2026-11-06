@@ -246,7 +246,9 @@ class TestBoardRpc(BoardCase):
         self.assertCode("BAD_ARGUMENT", self.rpc.lx_run, self.board.id, [1, 2])
         self.assertCode("BAD_ARGUMENT", self.rpc.lx_run, self.board.id, ["w1"] * 31)
         self.assertCode("UNKNOWN_WIDGET", self.rpc.lx_run, self.board.id, ["nope"])
-        self.assertCode("UNSUPPORTED", self.rpc.lx_run, self.board.id, None, {"period": "this_month"})
+        self.assertCode("BAD_FILTER", self.rpc.lx_run, self.board.id, None, {"period": "this_month"})  # this dashboard has no such filter
+        self.assertCode("BAD_ARGUMENT", self.rpc.lx_run, self.board.id, None, ["period"])
+        self.assertCode("BAD_ARGUMENT", self.rpc.lx_run, self.board.id, None, None, False, "w1")
         self.assertCode("BAD_ARGUMENT", self.rpc.lx_save, self.board.id, "not a spec")
         self.assertCode("BAD_ARGUMENT", self.rpc.lx_save, self.board.id, {}, "x" * 501)
         self.assertCode("BAD_ARGUMENT", self.rpc.lx_drill, self.board.id, None, [])
@@ -265,3 +267,92 @@ class TestBoardRpc(BoardCase):
         self.assertEqual(out["w3"]["error"]["code"], "INTERNAL")
         self.assertEqual(out["w4"]["error"]["code"], "INTERNAL")  # reported per widget, the call itself succeeds
         self.assertNotIn("boom", str(out))  # no internals leak to the browser
+
+
+@tagged("post_install", "-at_install", "levelix_board")
+class TestBoardPatch(BoardCase):
+    """Changing a dashboard with a patch, the options the assistant was unsure about, and keeping a draft."""
+
+    def setUp(self):
+        super().setUp()
+        spec = order_spec(self.partners)
+        spec["uncertain"] = [
+            {"text": "Show only the first 5 customers.", "patch": [{"op": "add", "path": "/widgets/1/data/limit", "value": 5}]},
+            {"text": "Rename the dashboard.", "patch": [{"op": "replace", "path": "/title", "value": "Renamed"}]},
+            {"text": "Drop the first widget.", "patch": [{"op": "remove", "path": "/widgets/0"}]},
+        ]
+        self.board = self.make_board(spec=spec, state="draft")
+        self.rpc = self.as_user(self.admin)
+
+    def test_a_patch_is_a_new_version_and_widget_ids_stay(self):
+        ids = [w["id"] for w in self.board.spec["widgets"]]
+        out = self.rpc.lx_apply_patch(self.board.id, [{"op": "replace", "path": "/title", "value": "Patched"}], "tweak")
+        self.assertEqual((out["version"], out["changed"]), (2, True))
+        self.assertEqual(self.board.spec["title"], "Patched")
+        self.assertEqual([w["id"] for w in self.board.spec["widgets"]], ids)
+        self.assertEqual(self.board.version_ids.filtered(lambda v: v.version == 2).note, "tweak")
+
+    def test_a_bad_patch_or_a_patch_that_breaks_the_dashboard_changes_nothing(self):
+        for patch, code in (
+            ([{"op": "replace", "path": "/widgets/0/id", "value": "x"}], "BAD_PATCH"),
+            ([{"op": "add", "path": "/widgets/0/data/limit", "value": 99999}], "BAD_LIMIT"),
+            ("no", "BAD_ARGUMENT"),
+            ([{"op": "add", "path": "/title", "value": "t"}] * 21, "BAD_ARGUMENT"),
+        ):
+            with self.subTest(patch=str(patch)[:40]), self.assertRaises(UserError) as ctx:
+                self.rpc.lx_apply_patch(self.board.id, patch)
+            self.assertEqual(getattr(ctx.exception, "code", None) or ctx.exception.errors[0].code, code)
+        self.assertEqual(self.board.version, 1)
+
+    def test_an_option_is_applied_from_the_stored_spec_and_leaves_the_others_that_still_fit(self):
+        out = self.rpc.lx_apply_uncertain(self.board.id, 1)  # rename
+        self.assertEqual(self.board.spec["title"], "Renamed")
+        self.assertEqual(out["version"], 2)
+        self.assertEqual([u["text"] for u in self.board.spec["uncertain"]], ["Show only the first 5 customers.", "Drop the first widget."])
+
+    def test_options_are_dropped_when_a_widget_was_removed_because_positions_moved(self):
+        self.rpc.lx_apply_uncertain(self.board.id, 2)  # drop widget 0: "first 5 customers" (widgets/1) would now hit another widget
+        self.assertEqual([w["id"] for w in self.board.spec["widgets"]], ["w2", "w3", "w4"])
+        self.assertNotIn("uncertain", self.board.spec)
+
+    def test_an_option_that_no_longer_applies_is_dropped(self):
+        spec = order_spec(self.partners)
+        spec["widgets"][2]["title"] = "Orders"
+        spec["uncertain"] = [
+            {"text": "Hide the title.", "patch": [{"op": "remove", "path": "/widgets/2/title"}]},
+            {"text": "Clear the title.", "patch": [{"op": "remove", "path": "/widgets/2/title"}]},  # the same change: nothing left to remove
+            {"text": "Rename the dashboard.", "patch": [{"op": "replace", "path": "/title", "value": "Renamed"}]},
+        ]
+        board = self.make_board(spec=spec)
+        self.rpc.lx_apply_uncertain(board.id, 0)
+        self.assertNotIn("title", board.spec["widgets"][2])
+        self.assertEqual([u["text"] for u in board.spec["uncertain"]], ["Rename the dashboard."])
+
+    def test_the_last_option_leaves_no_empty_list_behind(self):
+        for _ in range(3):
+            self.rpc.lx_apply_uncertain(self.board.id, 0)
+            if "uncertain" not in self.board.spec:
+                break
+        self.assertNotIn("uncertain", self.board.spec)
+
+    def test_an_unknown_option_is_refused(self):
+        for index in (-1, 3, True, "0", None):
+            with self.subTest(index=index), self.assertRaises(BoardError) as ctx:
+                self.rpc.lx_apply_uncertain(self.board.id, index)
+            self.assertEqual(ctx.exception.code, "BAD_ARGUMENT")
+
+    def test_only_the_owner_changes_and_keeps_a_dashboard(self):
+        self.board.share_mode = "company"
+        self.board.state = "draft"
+        seller = self.as_user(self.salesman)
+        self.board.state = "active"
+        for call in (lambda: seller.lx_apply_patch(self.board.id, [{"op": "add", "path": "/title", "value": "x"}]),
+                     lambda: seller.lx_apply_uncertain(self.board.id, 0), lambda: seller.lx_activate(self.board.id)):
+            with self.assertRaises(BoardError) as ctx:
+                call()
+            self.assertEqual(ctx.exception.code, "NO_ACCESS")
+
+    def test_keeping_a_draft_makes_it_a_normal_dashboard(self):
+        self.assertEqual(self.board.state, "draft")
+        card = self.rpc.lx_activate(self.board.id)
+        self.assertEqual((card["state"], self.board.state), ("active", "active"))

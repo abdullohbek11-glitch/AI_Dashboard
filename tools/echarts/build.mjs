@@ -11,3 +11,14 @@ await build({
 copyFileSync("node_modules/echarts/LICENSE", out + "LICENSE");
 copyFileSync("node_modules/echarts/NOTICE", out + "NOTICE");
 console.log("built", out + "echarts.min.js", Math.round(statSync(out + "echarts.min.js").size / 1024), "KB");
+
+// PNG export of the dashboard page (MIT): the page is drawn to an image in the browser, nothing leaves it.
+const imgOut = new URL("../../addons/levelix_board/static/lib/html_to_image/", import.meta.url).pathname;
+mkdirSync(imgOut, { recursive: true });
+await build({
+    entryPoints: ["html_to_image_entry.js"], bundle: true, minify: true, format: "iife", target: "es2020",
+    outfile: imgOut + "html-to-image.min.js", legalComments: "none",
+    banner: { js: "/*! html-to-image 1.11.13 (c) Bubkoo, MIT. */" },
+});
+copyFileSync("node_modules/html-to-image/LICENSE", imgOut + "LICENSE");
+console.log("built", imgOut + "html-to-image.min.js", Math.round(statSync(imgOut + "html-to-image.min.js").size / 1024), "KB");

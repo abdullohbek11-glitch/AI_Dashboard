@@ -2,7 +2,7 @@
 from odoo.exceptions import UserError
 from odoo.tests import tagged
 
-from .test_engine import TZ, AiCase
+from .support import TZ, AiCase
 
 
 @tagged("post_install", "-at_install", "levelix_ai_core", "-standard")
@@ -42,14 +42,102 @@ class TestTools(AiCase):
         self.assertTrue(result["report"])
         by_name = {f["name"]: f for f in result["fields"]}
         self.assertTrue(by_name["price_subtotal"]["summable"])
-        self.assertFalse(by_name["price_unit"]["summable"])  # Odoo marks a price as averaged, never added up
+        self.assertNotIn("summable", by_name["price_unit"])  # Odoo marks a price as averaged, never added up
         self.assertEqual(by_name["state"]["type"], "selection")
         self.assertIn(["sale", "Sales Order"], by_name["state"]["values"])
         self.assertEqual(by_name["partner_id"]["relation"], "res.partner")
         stored = self.env["sale.report"].fields_get(attributes=["store"])
         self.assertTrue(all(stored[name]["store"] for name in by_name))  # computed-only fields are left out
 
+    def test_describe_leaves_out_bookkeeping_and_a_second_look_is_short(self):
+        result, _side = self.run_tool("describe_model", model="sale.order")
+        names = {f["name"] for f in result["fields"]}
+        self.assertTrue({"partner_id", "state", "amount_total", "date_order"} <= names)
+        self.assertFalse(names & {"id", "create_uid", "write_uid", "message_ids", "message_follower_ids", "activity_ids", "access_token", "order_line"})
+        # the same model again in the same answer: the model already has the list
+        answer = self.env["levelix.ai.message"].sudo().create({
+            "conversation_id": self.env["levelix.ai.conversation"].sudo().create({"name": "t", "user_id": self.boss.id}).id, "role": "assistant"})
+        self.env["levelix.ai.tool.call"].sudo().create({"message_id": answer.id, "name": "describe_model", "res_model": "sale.order"})
+        again, _side = self.tools._run("describe_model", {"model": "sale.order"}, answer)
+        self.assertNotIn("fields", again)
+        other, _side = self.tools._run("describe_model", {"model": "sale.report"}, answer)
+        self.assertIn("fields", other)
+
     # -- counting and grouping -------------------------------------------------------------------------------
+
+    def test_a_week_can_be_grouped_by_weekday_with_monday_first(self):
+        # 10 March 2024 was a Sunday, 11th a Monday, 12th a Tuesday: 10:00 UTC is 15:00 in Tashkent
+        for when in ("2024-03-10 10:00:00", "2024-03-12 10:00:00", "2024-03-11 10:00:00", "2024-03-11 11:00:00"):
+            self.order(when)
+        domain = '[["partner_id","=",%d],["state","=","sale"]]' % self.customer.id
+        result, side = self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:day_of_week"], aggregates=["__count"], show="table")
+        self.assertEqual(result["groups"], [["Mon", 2], ["Tue", 1], ["Sun", 1]])  # the week reads Monday first, Sunday last
+        self.assertEqual(side["block"]["query"]["groupby"], ["date_order:day_of_week"])
+
+    def test_the_weekday_order_stays_monday_first_when_the_model_asks_for_it(self):
+        for when in ("2024-03-10 10:00:00", "2024-03-11 10:00:00", "2024-03-12 10:00:00"):
+            self.order(when)
+        domain = '[["partner_id","=",%d],["state","=","sale"]]' % self.customer.id
+        for order, expected in (("date_order:day_of_week asc", ["Mon", "Tue", "Sun"]), ("date_order:day_of_week desc", ["Sun", "Tue", "Mon"])):
+            with self.subTest(order=order):
+                result, _side = self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:day_of_week"], aggregates=["__count"], order=order)
+                self.assertEqual([g[0] for g in result["groups"]], expected)
+
+    def test_a_day_can_be_grouped_by_hour_but_a_date_has_no_hour(self):
+        for when in ("2024-03-11 10:00:00", "2024-03-12 10:00:00", "2024-03-12 11:00:00"):
+            self.order(when)
+        domain = '[["partner_id","=",%d],["state","=","sale"]]' % self.customer.id
+        result, _side = self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:hour_number"], aggregates=["__count"])
+        self.assertEqual(result["groups"], [["15:00", 2], ["16:00", 1]])  # local time
+        with self.assertRaises(UserError) as caught:  # `validity_date` is a date: no time of day
+            self.run_tool("aggregate", model="sale.order", domain="[]", groupby=["validity_date:hour_number"], aggregates=["__count"])
+        self.assertIn("without a time of day", str(caught.exception))
+
+    def test_a_weekday_by_hour_grid_is_a_table_of_both(self):
+        for when in ("2024-03-11 10:00:00", "2024-03-11 11:00:00", "2024-03-12 10:00:00"):
+            self.order(when)
+        domain = '[["partner_id","=",%d],["state","=","sale"]]' % self.customer.id
+        result, side = self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:day_of_week", "date_order:hour_number"], aggregates=["__count"], show="table")
+        self.assertEqual(result["groups"], [["Mon", "15:00", 1], ["Mon", "16:00", 1], ["Tue", "15:00", 1]])
+        self.assertEqual(side["block"]["type"], "table")
+
+    def test_the_orders_a_model_writes_by_habit_work_or_say_what_is_allowed(self):
+        self.order()
+        domain = '[["partner_id","=",%d],["state","=","sale"]]' % self.customer.id
+        for order in ("date_order:asc", "date_order asc", "date_order:day asc"):
+            with self.subTest(order=order):
+                result, side = self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:day"], aggregates=["__count"], order=order, show="table")
+                self.assertEqual(side["block"]["query"]["order"], "date_order:day asc")  # what is kept for a saved dashboard
+        with self.assertRaises(UserError) as caught:
+            self.run_tool("aggregate", model="sale.order", domain=domain, groupby=["date_order:day"], aggregates=["__count"], order="m1 desc")
+        self.assertIn("date_order:day, __count", str(caught.exception))
+
+    def test_measures_carry_the_name_the_model_gave_or_a_plain_default(self):
+        _result, side = self.run_tool("aggregate", model="sale.report", domain="[]", aggregates=["name:count_distinct"], labels=["Orders"], show="kpi")
+        self.assertEqual(side["block"]["items"][0]["label"], "Orders")
+        self.assertEqual(side["explain"]["measures"], ["Orders"])
+        result, side = self.run_tool("aggregate", model="sale.report", domain="[]", aggregates=["name:count_distinct", "price_unit:avg"], show="kpi")
+        self.assertEqual([i["label"] for i in side["block"]["items"]], ["Unique Order Reference", "Average Unit Price"])
+        self.assertEqual(result["column_labels"], ["Unique Order Reference", "Average Unit Price"])
+        _result, side = self.run_tool("aggregate", model="sale.report", domain="[]", aggregates=["__count", "price_subtotal:sum"], labels=["  "], show="kpi")
+        self.assertEqual([i["label"] for i in side["block"]["items"]], ["Count", "Untaxed Total"])  # a blank name is no name
+        _result, side = self.run_tool("aggregate", model="sale.report", domain="[]", aggregates=["__count"], labels=['"Total Sales"'], show="kpi")
+        self.assertEqual(side["block"]["items"][0]["label"], "Total Sales")  # quotes the model wrapped around the name are dropped
+
+    def test_the_answer_says_which_companies_the_numbers_cover(self):
+        result, side = self.run_tool("aggregate", model="sale.order", domain="[]", aggregates=["__count"], show="kpi")
+        self.assertNotIn("companies", result)  # one company: nothing to explain
+        self.assertFalse(side["block"]["scope"])
+        second = self.env["res.company"].create({"name": "AI second company"})
+        self.boss.write({"company_ids": [(4, second.id)]})
+        tools = self.env["levelix.ai.tools"].with_user(self.boss).with_context(tz=TZ, allowed_company_ids=[self.boss.company_id.id])
+        result, side = tools._run("aggregate", {"model": "sale.order", "domain": "[]", "aggregates": ["__count"], "show": "kpi"}, self.message)
+        self.assertEqual(result["companies"], self.boss.company_id.name)
+        self.assertEqual(side["block"]["scope"], "Company: %s" % self.boss.company_id.name)
+        self.assertEqual(side["explain"]["companies"], self.boss.company_id.name)
+        both = tools.with_context(allowed_company_ids=[self.boss.company_id.id, second.id])
+        result, _side = both._run("aggregate", {"model": "sale.order", "domain": "[]", "aggregates": ["__count"]}, self.message)
+        self.assertEqual(set(result["companies"].split(", ")), {self.boss.company_id.name, "AI second company"})
 
     def test_a_count_matches_the_orm(self):
         self.order("2024-03-10 10:00:00")

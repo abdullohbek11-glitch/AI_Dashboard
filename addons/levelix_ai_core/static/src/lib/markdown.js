@@ -1,7 +1,7 @@
 /** @odoo-module **/
 // A small, safe Markdown reader for model answers. Everything is HTML-escaped FIRST and only then are
 // our own tags added, so text from the model (or from data it read) can never become markup.
-// Supported: paragraphs, line breaks, **bold**, *italic*, `code`, "- " / "1. " lists, "#" headings.
+// Supported: paragraphs, line breaks, **bold**, *italic*, `code`, "- " / "1. " lists (a lone item reads as a sentence), "#" headings.
 // Links and images are deliberately not supported.
 
 const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -30,7 +30,12 @@ export function renderMarkdown(text) {
     };
     const flushList = () => {
         if (list) {
-            out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
+            // a single item has no list structure to show: read it as a sentence
+            out.push(
+                list.items.length === 1
+                    ? `<p>${inline(list.items[0])}</p>`
+                    : `<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`
+            );
             list = null;
         }
     };

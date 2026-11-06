@@ -20,8 +20,8 @@ from .catalog import Catalog, ModelInfo
 from .errors import BoardError
 from .i18n import t
 
-ACTIONS = ("drill", "filter", "open_record", "none")
-IMPLEMENTED_ACTIONS = ("drill", "none")  # the rest is accepted by name but not built yet
+ACTIONS = ("drill", "cross_filter", "filter", "open_record", "none")
+IMPLEMENTED_ACTIONS = ("drill", "cross_filter", "none")  # the rest is accepted by name but not built yet
 OPEN_AS = ("side_table", "dialog", "odoo_list")
 MAX_DRILL_ROWS = 80
 MAX_COLUMNS = 12
@@ -81,6 +81,9 @@ def check(widget, source: ModelInfo, catalog: Catalog, path: str) -> list:
         return [BoardError("UNSUPPORTED", cpath + ".action", "The click action '%s' is not available yet." % action)]
     if action == "none":
         return []
+    if action == "cross_filter":  # clicking narrows the other widgets of the same data; it needs no model or columns
+        extra = sorted(set(click) - {"action"})
+        return [BoardError("BAD_SPEC", cpath, "A cross-filter needs only 'action'; remove %s." % ", ".join("'%s'" % k for k in extra))] if extra else []
     if click.get("open_as", "side_table") not in OPEN_AS:
         errors.append(BoardError("BAD_ACTION", cpath + ".open_as", "'open_as' must be one of: %s." % ", ".join(OPEN_AS)))
 

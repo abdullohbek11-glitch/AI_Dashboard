@@ -36,11 +36,13 @@ class ProviderError(Exception):
 def http_message(status, detail, model=""):
     """What the user reads for an HTTP failure of the vendor."""
     if status in (401, 403):
-        return "The AI provider refused the API key. Check the key in the settings.", "auth"
+        why = " The provider says: %s" % detail[:200] if detail else ""
+        return "The AI provider refused the API key. Check the key in the settings.%s" % why, "auth"
     if status == 404 and model:
         return "The AI provider does not know the model '%s'. Check the model name in the settings." % model, "request"
     if status == 429:
-        return "The AI provider's rate limit or quota was reached. Try again in a minute, or check the plan of the account.", "rate_limit"
+        why = " The provider says: %s" % detail[:200] if detail else ""
+        return "The AI provider's rate limit or quota was reached. Try again in a minute, or check the plan of the account.%s" % why, "rate_limit"
     if status >= 500:
         return "The AI provider is having trouble right now (error %d). Try again shortly." % status, "server"
     return "The AI provider rejected the request (%d): %s" % (status, detail or "no details"), "request"
@@ -77,19 +79,23 @@ def loads(text):
     return value if isinstance(value, dict) else {}
 
 
+REASONING_LEVELS = ("minimal", "low", "medium", "high")
+
+
 class Provider:
     name = ""
     label = ""
     default_model = ""
     base_url = ""
 
-    def __init__(self, api_key, model=None, base_url=None, timeout=READ_TIMEOUT, retries=RETRIES, temperature=None, sleep=time.sleep):
+    def __init__(self, api_key, model=None, base_url=None, timeout=READ_TIMEOUT, retries=RETRIES, temperature=None, sleep=time.sleep, reasoning=None):
         self.api_key = api_key
         self.model = model or self.default_model
         self.base_url = (base_url or self.base_url).rstrip("/")
         self.timeout = (CONNECT_TIMEOUT, timeout)
         self.retries = retries
         self.temperature = temperature
+        self.reasoning = reasoning if reasoning in REASONING_LEVELS else None  # how long a thinking model may think: faster or more careful
         self._sleep = sleep
 
     # -- to implement ----------------------------------------------------------------

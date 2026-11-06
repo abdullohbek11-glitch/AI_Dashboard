@@ -25,6 +25,7 @@ DEFAULT_TIMEOUT_MS = 8000
 class RawResult:
     groups: list  # formatted_read_group rows
     total: Optional[dict] = None  # the same aggregates without grouping (for "Others")
+    compare_groups: Optional[list] = None  # the same query over the earlier period (``compare``)
 
 
 class Runner:
@@ -40,14 +41,22 @@ class Runner:
                 having=plan.having, limit=plan.query_limit, order=plan.order,
             )
             total = None
-            if plan.others or plan.totals:
+            if plan.others or plan.totals or plan.auto_others:
                 rows = model.formatted_read_group(plan.domain, [], plan.aggregates)
                 total = rows[0] if rows else {}
-        return RawResult(groups, total)
+            earlier = None
+            if plan.compare is not None:
+                earlier = model.formatted_read_group(
+                    plan.compare.domain, plan.groupby, plan.aggregates,
+                    having=plan.having, limit=plan.query_limit, order=plan.order,
+                )
+        return RawResult(groups, total, earlier)
 
     def currency_ids(self, plan: Plan) -> list:
         """Ids of the currencies that actually contribute to a monetary measure."""
-        keys = [m.key for m in plan.measures if m.type == "monetary"]
+        keys = [m.key for m in plan.measures if m.type == "monetary" and m.key]  # a calculated measure has no column of its own
+        if not keys:
+            return []
         with self._guard():
             rows = self._model(plan).formatted_read_group(plan.domain, ["currency_id"], keys)
         return [row["currency_id"][0] for row in rows

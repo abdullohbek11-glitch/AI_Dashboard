@@ -22,6 +22,7 @@ export const aiChatService = {
             suggestions: [],
             conversations: [],
             conversation: null,
+            pinned: null, // a record the whole chat is about: { model, id, label }
             messages: [],
             busy: false,
             status: "",
@@ -56,12 +57,21 @@ export const aiChatService = {
         async function load(conversationId) {
             const data = await orm.call(MODEL, "lx_load", [[conversationId]]);
             state.conversation = data.conversation;
+            state.pinned = data.conversation.pin || null; // a chat opened from a record keeps being about it
             state.messages = data.messages;
             const streaming = data.messages.some((m) => m.state === "streaming");
             if (!streaming) {
                 finish();
             }
             return streaming;
+        }
+
+        function pinnedMentions(mentions) {
+            const pinned = state.pinned;
+            if (!pinned || mentions.some((m) => m.model === pinned.model && m.id === pinned.id)) {
+                return mentions;
+            }
+            return [...mentions, { model: pinned.model, id: pinned.id }];
         }
 
         const api = {
@@ -77,7 +87,16 @@ export const aiChatService = {
                     conversations: data.conversations,
                 });
             },
+            /** The reader's earlier chats about one record. */
+            pinnedChats(model, id) {
+                return orm.call(MODEL, "lx_pinned", [model, id]);
+            },
+            /** Make every question of this chat about one record (sent as a mention); `null` lets go. */
+            pin(record) {
+                state.pinned = record || null;
+            },
             newChat() {
+                state.pinned = null;
                 state.conversation = null;
                 state.messages = [];
                 state.error = "";
@@ -105,7 +124,7 @@ export const aiChatService = {
                 state.busy = true;
                 state.status = _t("Thinking…");
                 try {
-                    const data = await orm.call(MODEL, "lx_send", [state.conversation?.id || false, text, { mentions, choice }]);
+                    const data = await orm.call(MODEL, "lx_send", [state.conversation?.id || false, text, { mentions: pinnedMentions(mentions), choice, pin: state.pinned ? { model: state.pinned.model, id: state.pinned.id } : undefined }]);
                     if (!state.conversation) {
                         state.conversations.unshift(data.conversation);
                     }
@@ -125,6 +144,14 @@ export const aiChatService = {
                         load(state.conversation.id);
                     }
                 }, 5000);
+            },
+            /** "This answer is wrong": kept with its question for the golden set. */
+            async markWrong(message, note) {
+                await orm.call(MODEL, "lx_feedback", [message.id, note || false]);
+                const index = state.messages.findIndex((m) => m.id === message.id);
+                if (index >= 0) {
+                    state.messages[index] = { ...state.messages[index], marked: true };
+                }
             },
             /** A button the assistant offered was pressed: the choice becomes the next question. */
             choose(option) {

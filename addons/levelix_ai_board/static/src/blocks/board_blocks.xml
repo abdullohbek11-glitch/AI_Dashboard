@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_ai_board.BoardDraftBlock">
+        <div class="lxai-block lxai-draft" t-att-data-board-id="props.block.board_id" t-att-data-state="board ? board.state : 'missing'">
+            <div class="lxai-block__head">
+                <strong t-esc="board ? board.name : props.block.title"/>
+                <span t-if="board" t-attf-class="lxai-chip {{saved ? 'lxai-chip--ok' : ''}}" t-esc="saved ? 'Saved' : 'Draft'"/>
+            </div>
+
+            <div t-if="state.error" class="lxai-error" role="alert" t-esc="state.error"/>
+
+            <div t-if="board" class="lxb lxb-inline" t-att-data-theme="themeState.mode">
+                <div class="lxai-draft__grid">
+                    <BoardWidget t-foreach="board.spec.widgets" t-as="widget" t-key="widget.id"
+                                 boardId="board.id" widget="widget" reloadKey="state.reloadKey" onDrill="noop"/>
+                </div>
+            </div>
+
+            <ul t-if="props.block.warnings.length" class="lxai-draft__warnings" aria-label="Warnings">
+                <li t-foreach="props.block.warnings" t-as="warning" t-key="warning_index" class="lxai-note lxai-note--warn">
+                    <span t-if="warning.widget" t-esc="warning.widget + ': '"/><t t-esc="warning.text"/>
+                </li>
+            </ul>
+
+            <div t-if="board and board.spec.assumptions and board.spec.assumptions.length" class="lxai-draft__assumptions">
+                <div class="lxai-note">What I assumed</div>
+                <ul><li t-foreach="board.spec.assumptions" t-as="line" t-key="line_index" t-esc="line"/></ul>
+            </div>
+
+            <div t-if="board and uncertain.length" class="lxai-draft__unsure">
+                <div class="lxai-note">I was not sure about</div>
+                <div t-foreach="uncertain" t-as="option" t-key="option_index" class="lxai-draft__option">
+                    <span t-esc="option.text"/>
+                    <button class="lxai-btn" t-att-disabled="state.busy" t-on-click="() => this.applyOption(option_index)">Yes, do this</button>
+                </div>
+            </div>
+
+            <div t-if="board" class="lxai-draft__actions">
+                <t t-if="saved">
+                    <button class="lxai-btn lxai-btn--primary" t-on-click="open">Open dashboard</button>
+                </t>
+                <t t-else="">
+                    <button class="lxai-btn lxai-btn--primary" t-att-disabled="state.busy" t-on-click="keep">Keep</button>
+                    <button class="lxai-btn" t-att-disabled="state.busy" t-on-click="change">Change</button>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="levelix_ai_board.SaveOfferBlock">
+        <div class="lxai-block lxai-offer" t-att-data-state="savedBoard ? 'saved' : 'offer'">
+            <t t-if="savedBoard">
+                <div class="lxai-offer__text">
+                    <strong>Saved<t t-if="savedBoard.name"> as “<t t-esc="savedBoard.name"/>”</t></strong>
+                    <span class="lxai-note">It uses today's data each time it is opened.</span>
+                </div>
+                <ul t-if="savedBoard.notes and savedBoard.notes.length" class="lxai-draft__warnings">
+                    <li t-foreach="savedBoard.notes" t-as="note" t-key="note_index" class="lxai-note lxai-note--warn" t-esc="note"/>
+                </ul>
+                <button class="lxai-btn lxai-btn--primary" t-on-click="open">Open dashboard</button>
+            </t>
+            <t t-else="">
+                <div class="lxai-offer__text">
+                    <strong>Keep this as a dashboard?</strong>
+                    <span class="lxai-note">If the numbers look right, save <t t-if="props.block.count > 1">these <t t-esc="props.block.count"/> results</t><t t-else="">this result</t> to open again later. You can ignore this.</span>
+                </div>
+                <div t-if="state.error" class="lxai-error" role="alert" t-esc="state.error"/>
+                <button class="lxai-btn lxai-btn--primary" t-att-disabled="state.busy" t-on-click="save">Save as dashboard</button>
+            </t>
+        </div>
+    </t>
+
+    <t t-name="levelix_ai_board.BoardExplainBlock">
+        <details class="lxai-block lxai-explain-block" open="open">
+            <summary><strong>What I did</strong></summary>
+            <div t-foreach="props.block.widgets" t-as="widget" t-key="widget.id" class="lxai-explain-block__widget">
+                <div class="lxai-explain-block__title" t-esc="widget.title"/>
+                <ul>
+                    <li t-foreach="important(widget)" t-as="line" t-key="line_index" t-attf-class="lxai-explain-block__line--{{line.kind}}" t-esc="line.text"/>
+                </ul>
+                <details t-if="details(widget).length" class="lxai-explain">
+                    <summary>Details (<t t-esc="details(widget).length"/>)</summary>
+                    <ul><li t-foreach="details(widget)" t-as="line" t-key="line_index" t-esc="line.text"/></ul>
+                </details>
+            </div>
+        </details>
+    </t>
+</templates>

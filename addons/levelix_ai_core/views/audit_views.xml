@@ -101,6 +101,45 @@
         </field>
     </record>
 
+    <record id="view_ai_feedback_list" model="ir.ui.view">
+        <field name="name">levelix.ai.feedback.list</field>
+        <field name="model">levelix.ai.feedback</field>
+        <field name="arch" type="xml">
+            <list create="0" delete="0">
+                <field name="create_date"/>
+                <field name="user_id"/>
+                <field name="question"/>
+                <field name="note"/>
+                <field name="privacy" optional="hide"/>
+                <field name="golden" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_feedback_form" model="ir.ui.view">
+        <field name="name">levelix.ai.feedback.form</field>
+        <field name="model">levelix.ai.feedback</field>
+        <field name="arch" type="xml">
+            <form create="0" delete="0">
+                <sheet>
+                    <group>
+                        <group><field name="create_date"/><field name="user_id"/><field name="privacy"/></group>
+                        <group><field name="note"/><field name="golden"/></group>
+                    </group>
+                    <group string="Question"><field name="question" nolabel="1"/></group>
+                    <group string="Answer"><field name="answer" nolabel="1"/><field name="error"/></group>
+                    <group string="What the assistant did"><field name="calls" widget="ace" options="{'mode': 'json'}" nolabel="1"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_feedback" model="ir.actions.act_window">
+        <field name="name">Marked as Wrong</field>
+        <field name="res_model">levelix.ai.feedback</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
     <record id="action_ai_tool_call" model="ir.actions.act_window">
         <field name="name">Tool Calls</field>
         <field name="res_model">levelix.ai.tool.call</field>
@@ -125,6 +164,8 @@
               action="action_ai_conversation" groups="base.group_system"/>
     <menuitem id="menu_levelix_ai_tool_calls" name="Tool Calls" parent="menu_levelix_ai_root" sequence="30"
               action="action_ai_tool_call" groups="base.group_system"/>
+    <menuitem id="menu_levelix_ai_feedback" name="Marked as Wrong" parent="menu_levelix_ai_root" sequence="35"
+              action="action_ai_feedback" groups="base.group_system"/>
     <menuitem id="menu_levelix_ai_settings" name="Settings" parent="menu_levelix_ai_root" sequence="40"
               action="action_levelix_ai_settings" groups="base.group_system"/>
 </odoo>

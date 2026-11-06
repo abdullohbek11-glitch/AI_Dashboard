@@ -1,7 +1,11 @@
 import json
+import re
 import uuid
 
 from .base import Provider, loads, sse
+
+
+THINKING_MODELS = re.compile(r"^(gpt-5|o\d)")
 
 
 class OpenAI(Provider):
@@ -43,6 +47,8 @@ class OpenAI(Provider):
             body["tools"] = [{"type": "function", "function": t} for t in tools]
         if self.temperature is not None:
             body["temperature"] = self.temperature
+        if self.reasoning and THINKING_MODELS.match(self.model):  # a model that does not think rejects the setting
+            body["reasoning_effort"] = self.reasoning
         headers = {"Authorization": f"Bearer {self.api_key}"}
         usage = {"input": 0, "output": 0, "cached": 0}
         pending = {}

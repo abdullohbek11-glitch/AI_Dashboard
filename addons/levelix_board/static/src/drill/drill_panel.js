@@ -22,9 +22,9 @@ export class DrillPanel extends Component {
     }
 
     async load() {
-        const { widgetId, groupRef } = this.props.request;
+        const { widgetId, groupRef, filters, cross } = this.props.request;
         try {
-            this.state.result = await this.data.drill(this.props.boardId, widgetId, groupRef);
+            this.state.result = await this.data.drill(this.props.boardId, widgetId, groupRef, filters, cross);
         } catch (error) {
             this.state.error = rpcMessage(error);
         }

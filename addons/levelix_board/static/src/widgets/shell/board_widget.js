@@ -18,13 +18,23 @@ export class BoardWidget extends Component {
         widget: Object,
         reloadKey: Number,
         onDrill: Function,
+        onCross: { type: Function, optional: true },
+        editing: { type: Boolean, optional: true },
+        draft: { type: Boolean, optional: true }, // not saved yet: run it from the editor's copy, not from the stored dashboard
+        types: { type: Array, optional: true }, // the types this widget could be switched to
+        onDragStart: { type: Function, optional: true },
+        onRename: { type: Function, optional: true },
+        onRetype: { type: Function, optional: true },
+        onRemove: { type: Function, optional: true },
+        filters: { type: Object, optional: true },
+        cross: { optional: true }, // {widget_id, group_ref} or null
         style: { type: String, optional: true },
     };
 
     setup() {
         this.data = useService("levelix_board.data");
         this.root = useRef("root");
-        this.state = useState({ status: "idle", frame: null, error: null, explain: null });
+        this.state = useState({ status: "idle", frame: null, error: null, explain: null, titleDraft: null });
         this.visible = false;
         this.requestId = 0;
 
@@ -64,13 +74,22 @@ export class BoardWidget extends Component {
             widget: this.props.widget,
             kind: definition.kind,
             adapter: definition.adapter(this.props.widget),
-            onRowClick: this.canDrill ? (rowIndex) => this.drill(rowIndex) : undefined,
+            onRowClick: this.canClick ? (rowIndex) => this.clicked(rowIndex) : undefined,
         };
     }
 
-    get canDrill() {
-        const click = (this.props.widget.interact || {}).on_click;
-        return Boolean(click && click.action === "drill");
+    get clickAction() {
+        return ((this.props.widget.interact || {}).on_click || {}).action;
+    }
+
+    /** A click opens the records behind the point (`drill`) or narrows the other widgets to it (`cross_filter`). */
+    get canClick() {
+        return ["drill", "cross_filter"].includes(this.clickAction);
+    }
+
+    /** This widget is the one the dashboard is currently filtered by. */
+    get isCrossSource() {
+        return Boolean(this.props.cross && this.props.cross.widget_id === this.props.widget.id);
     }
 
     get isEmpty() {
@@ -100,7 +119,9 @@ export class BoardWidget extends Component {
         this.state.status = "loading";
         this.state.explain = null;
         try {
-            const result = await this.data.runWidget(this.props.boardId, this.props.widget.id);
+            const result = this.props.draft
+                ? await this.data.previewWidget(this.props.widget)
+                : await this.data.runWidget(this.props.boardId, this.props.widget.id, this.filterValues, this.props.cross || null);
             if (requestId !== this.requestId) {
                 return;
             }
@@ -120,18 +141,38 @@ export class BoardWidget extends Component {
         }
     }
 
-    drill(rowIndex) {
+    /** What is being typed in the title box survives a redraw of the card (the data arriving, a filter changing). */
+    onTitleInput(event) {
+        this.state.titleDraft = event.target.value;
+    }
+
+    onTitleChange(event) {
+        this.state.titleDraft = null;
+        this.props.onRename(this.props.widget.id, event.target.value);
+    }
+
+    get filterValues() {
+        const values = this.props.filters;
+        return values && Object.keys(values).length ? { ...values } : null;
+    }
+
+    clicked(rowIndex) {
         const frame = this.state.frame;
         if (!isDrillableRow(frame, rowIndex)) {
             return;
         }
         const dims = frame.columns.filter((c) => c.role === "dimension").length;
-        this.props.onDrill({
+        const request = {
             widgetId: this.props.widget.id,
             title: this.title,
             groupRef: groupRefAt(frame, rowIndex),
             label: frame.rows[rowIndex].slice(0, dims).join(" · "),
-        });
+        };
+        if (this.clickAction === "cross_filter") {
+            this.props.onCross && this.props.onCross(request);
+        } else {
+            this.props.onDrill(request);
+        }
     }
 
     async toggleExplain() {
@@ -140,7 +181,7 @@ export class BoardWidget extends Component {
             return;
         }
         try {
-            const result = await this.data.explain(this.props.boardId, this.props.widget.id);
+            const result = await this.data.explain(this.props.boardId, this.props.widget.id, this.filterValues, this.props.cross || null);
             this.state.explain = result.explain || [{ kind: "warning", text: (result.error && result.error.message) || "", detail: false }];
         } catch (error) {
             this.state.explain = [{ kind: "warning", text: rpcMessage(error), detail: false }];

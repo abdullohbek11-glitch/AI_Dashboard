@@ -1,0 +1,20 @@
+// The dashboard draft inside the chat. The widgets are the dashboard page's own (`.lxb` tokens); only the frame is ours.
+.lxai .lxai-draft {
+    .lxb.lxb-inline { padding: 0; min-height: 0; background: transparent; overflow: visible; font-size: inherit; }
+    .lxai-draft__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+    .lxb-inline .lxb-card { height: 280px; }
+    .lxai-draft__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .lxai-draft__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--lxai-border); }
+    .lxai-draft__warnings, .lxai-draft__assumptions ul { margin: 0; padding-left: 18px; }
+    .lxai-chip--ok { color: var(--lxai-accent); border-color: var(--lxai-accent); }
+}
+.lxai .lxai-explain-block {
+    summary { cursor: pointer; }
+    .lxai-explain-block__widget { margin-top: 10px; }
+    .lxai-explain-block__title { font-weight: 650; color: var(--lxai-muted); }
+    ul { margin: 4px 0; padding-left: 18px; }
+    .lxai-explain-block__line--warning { color: var(--lxai-warn); }
+}
+
+.lxai .lxai-offer { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.lxai .lxai-offer__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 260px; min-height: 0; }

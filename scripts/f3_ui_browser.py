@@ -17,7 +17,7 @@ import tempfile
 import time
 import urllib.request
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeout, sync_playwright
 
 BASE = "http://localhost:8075"
 DB = "aidash"
@@ -94,7 +94,7 @@ bad = {"v": 1, "widgets": [
      "data": {"source": "sale.report", "domain": [["state", "=", "sale"], ["date", ">=", "today +400d"]],
               "dimensions": [{"field": "date", "granularity": "day"}], "measures": [{"id": "m1", "agg": "count"}]}},
     kpi("secret", "No access", 18, source="ir.config_parameter", domain=[]),
-    {"id": "future", "type": "funnel", "title": "Not built yet", "grid": {"x": 0, "y": 10, "w": 12, "h": 6},
+    {"id": "future", "type": "sankey", "title": "Not built yet", "grid": {"x": 0, "y": 10, "w": 12, "h": 6},
      "data": {"source": "sale.report", "domain": [["state", "=", "sale"]], "dimensions": [{"field": "partner_id"}], "measures": [{"id": "m1", "agg": "count"}]}},
 ]}
 env.cr.execute("UPDATE levelix_board SET spec = %s::jsonb WHERE id = %s", [json.dumps(bad), board.id])  # skips the save-time check on purpose
@@ -123,8 +123,12 @@ def login(context, user):
 def open_boards(page):
     page.goto(BASE + "/odoo")
     page.wait_for_selector(".o_navbar", timeout=20000)
-    page.click(".o_menu_toggle, .o_navbar_apps_menu button")
-    page.click(".o-dropdown-item:has-text('Levelix Boards'), a:has-text('Levelix Boards')")
+    try:  # the M-Dom home screen (main_menu_animated) lists the apps as tiles
+        page.wait_for_selector(".o_home_menu", timeout=4000)
+        page.click(".o_home_menu >> text=Levelix Boards")
+    except PlaywrightTimeout:  # the standard apps dropdown
+        page.click(".o_menu_toggle, .o_navbar_apps_menu button")
+        page.click(".o-dropdown-item:has-text('Levelix Boards'), a:has-text('Levelix Boards')")
     page.wait_for_selector(".lxb", timeout=20000)
 
 
@@ -186,6 +190,15 @@ def main():
             wait_ready(page, ["revenue", "orders", "by_seller", "daily", "top_products", "customers"])
             height = page.evaluate("document.querySelector('.lxb').getBoundingClientRect().height")
             check("1", skeletons >= 1 and height >= 800, "skeleton cards while loading: %d, then 6 ready cards; page height %dpx" % (skeletons, height))
+            # the page must scroll by itself when the grid is taller than the screen (the action area clips everything below it)
+            page.mouse.move(600, 500)
+            for _ in range(8):  # cards below the fold load as they come into view, so the page grows while it scrolls
+                page.mouse.wheel(0, 3000)
+                page.wait_for_timeout(500)
+            scroll = page.evaluate("(() => { const e = document.querySelector('.lxb'); return [e.scrollTop, e.scrollHeight - e.clientHeight]; })()")
+            last = page.evaluate("(() => { const c = [...document.querySelectorAll('.lxb-card')].pop().getBoundingClientRect(); return c.bottom <= window.innerHeight + 1; })()")
+            check("1b", scroll[1] > 0 and scroll[0] >= scroll[1] - 1 and last, "the board scrolls: scrollTop %d of %d, last card fully in view: %s" % (scroll[0], scroll[1], last))
+            page.evaluate("document.querySelector('.lxb').scrollTop = 0")
             page.locator("section[data-widget-id=revenue]").scroll_into_view_if_needed()
             shot(page, "03_board_light")
 

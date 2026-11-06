@@ -2,9 +2,19 @@
 <templates xml:space="preserve">
     <t t-name="levelix_board.BoardWidget">
         <section class="lxb-card" t-ref="root" tabindex="0" t-att-style="props.style" t-att-aria-label="title" t-att-data-widget-id="props.widget.id" t-att-data-status="state.status">
-            <header class="lxb-card__head">
-                <h3 class="lxb-card__title" t-esc="title"/>
-                <button t-if="state.status === 'ready'" class="lxb-icon-btn" aria-label="How it was calculated" title="How it was calculated" t-on-click="toggleExplain">
+            <header t-attf-class="lxb-card__head {{props.editing ? 'lxb-card__head--edit' : ''}}">
+                <button t-if="props.editing" type="button" class="lxb-icon-btn lxb-drag" aria-label="Move this widget" title="Drag to move"
+                        t-on-pointerdown="(ev) => props.onDragStart(ev, props.widget.id, 'move')">⠿</button>
+                <input t-if="props.editing" class="lxb-title-input" aria-label="Widget title" t-att-value="state.titleDraft ?? title" maxlength="80"
+                       t-on-input="onTitleInput" t-on-change="onTitleChange"/>
+                <h3 t-else="" class="lxb-card__title" t-esc="title"/>
+                <select t-if="props.editing and props.types and props.types.length > 1" class="lxb-select lxb-select--small" aria-label="Widget type"
+                        t-on-change="(ev) => props.onRetype(props.widget.id, ev.target.value)">
+                    <option t-foreach="props.types" t-as="type" t-key="type" t-att-value="type" t-att-selected="type === props.widget.type" t-esc="type"/>
+                </select>
+                <button t-if="props.editing" type="button" class="lxb-icon-btn" aria-label="Remove this widget" title="Remove"
+                        t-on-click="() => props.onRemove(props.widget.id)">🗑</button>
+                <button t-if="state.status === 'ready' and !props.editing" class="lxb-icon-btn" aria-label="How it was calculated" title="How it was calculated" t-on-click="toggleExplain">
                     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v6M12 7.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 </button>
             </header>
@@ -29,6 +39,8 @@
                 <span t-foreach="warnings" t-as="warning" t-key="warning_index" t-esc="warning.text" t-att-title="warning.code"/>
             </footer>
             <ExplainPanel t-if="state.explain" lines="state.explain" onClose="() => state.explain = null"/>
+            <div t-if="props.editing" class="lxb-resize" role="button" aria-label="Resize this widget" title="Drag to resize"
+                 t-on-pointerdown="(ev) => props.onDragStart(ev, props.widget.id, 'resize')"/>
         </section>
     </t>
 </templates>

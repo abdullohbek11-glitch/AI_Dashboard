@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.ShareDialog">
+        <div class="lxb-modal" role="dialog" aria-label="Share">
+            <div class="lxb-modal__box lxb-modal__box--narrow">
+                <header class="lxb-modal__head"><h2>Share this dashboard</h2><button class="lxb-icon-btn" aria-label="Close" t-on-click="props.onClose">✕</button></header>
+                <div class="lxb-modal__body lxb-form">
+                    <div t-if="isDraft" class="lxb-note lxb-note--warn">This dashboard is a draft. Keep it first; then it can be shared.</div>
+                    <label t-foreach="levels" t-as="level" t-key="level.value" class="lxb-radio">
+                        <input type="radio" name="lxb-share" t-att-value="level.value" t-att-checked="state.mode === level.value"
+                               t-att-disabled="isDraft and level.value !== 'private'" t-on-change="() => state.mode = level.value"/>
+                        <span t-esc="level.label"/>
+                    </label>
+                    <div t-if="state.mode === 'groups'" class="lxb-groups" role="group" aria-label="Groups">
+                        <label t-foreach="state.options" t-as="group" t-key="group.id" class="lxb-toggle">
+                            <input type="checkbox" t-att-checked="state.groups.includes(group.id)" t-on-change="() => this.toggle(group.id)"/>
+                            <span t-esc="group.name"/>
+                        </label>
+                    </div>
+                    <div class="lxb-note">Everyone sees the numbers their own access rights allow, not the owner's. Readers cannot change the dashboard; they can make their own copy.</div>
+                    <div t-if="state.error" class="lxb-state lxb-state--error" role="alert"><div class="lxb-state__text" t-esc="state.error"/></div>
+                </div>
+                <footer class="lxb-modal__foot">
+                    <button class="lxb-btn lxb-btn--ghost" t-on-click="props.onClose">Cancel</button>
+                    <button class="lxb-btn lxb-btn--primary" t-att-disabled="!canSave" t-on-click="save">Save</button>
+                </footer>
+            </div>
+        </div>
+    </t>
+</templates>

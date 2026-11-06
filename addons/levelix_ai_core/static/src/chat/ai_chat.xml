@@ -37,13 +37,22 @@
                         <div t-else="" class="lxai-msg lxai-msg--assistant" t-att-data-state="message.state">
                             <t t-foreach="message.blocks" t-as="block" t-key="block_index">
                                 <t t-set="Block" t-value="blockComponent(block)"/>
-                                <t t-if="Block"><t t-component="Block" block="block" onOpen="(spec, title) => chat.openSpec(spec, title)" onChoose="(option) => chat.choose(option)"/></t>
+                                <t t-if="Block"><t t-component="Block" block="block" onOpen="(spec, title) => chat.openSpec(spec, title)" onChoose="(option) => chat.choose(option)" onPrefill="(text) => this.prefill(text)"/></t>
                             </t>
                             <div t-if="message.text" class="lxai-text" t-out="html(message.text)"/>
                             <div t-if="message.state === 'streaming' and !message.text" class="lxai-status" t-esc="state.status or 'Thinking…'"/>
                             <div t-if="message.state === 'error'" class="lxai-error" role="alert">
                                 <span t-esc="message.error"/>
                                 <button class="lxai-link" t-on-click="() => this.retry(message_index)">Try again</button>
+                            </div>
+                            <div t-if="message.state !== 'streaming'" class="lxai-mark">
+                                <span t-if="message.marked" class="lxai-note">Marked as wrong. Thank you.</span>
+                                <button t-elif="ui.marking !== message.id" class="lxai-link" t-on-click="() => this.startMarking(message)">Wrong answer?</button>
+                                <form t-else="" class="lxai-mark__form" t-on-submit.prevent="() => this.sendMark(message)">
+                                    <input type="text" t-model="ui.note" maxlength="500" placeholder="What was wrong? (optional)" aria-label="What was wrong?"/>
+                                    <button class="lxai-btn" type="submit">Send</button>
+                                    <button class="lxai-link" type="button" t-on-click="() => ui.marking = 0">Cancel</button>
+                                </form>
                             </div>
                             <details t-if="message.explain and message.explain.length" class="lxai-explain">
                                 <summary>How I got this</summary>
@@ -52,6 +61,7 @@
                                         <t t-esc="line.label"/><t t-if="line.measures and line.measures.length">: <t t-esc="line.measures.join(', ')"/></t>
                                         <t t-if="line.grouped and line.grouped.length"> by <t t-esc="line.grouped.join(', ')"/></t>
                                         <t t-if="line.filters and line.filters.length"> (<t t-esc="line.filters.join('; ')"/>)</t>
+                                        <t t-if="line.companies"> · <t t-esc="line.companies"/></t>
                                     </li>
                                 </ul>
                             </details>
@@ -61,6 +71,11 @@
 
                 <div t-if="state.error" class="lxai-error lxai-error--banner" role="alert" t-esc="state.error"/>
                 <div t-if="state.busy and state.messages.length" class="lxai-status lxai-status--bar" t-esc="state.status"/>
+
+                <div t-if="state.pinned" class="lxai-pinned" t-att-data-pinned="state.pinned.model + ':' + state.pinned.id">
+                    <span>About: <strong t-esc="state.pinned.label"/></span>
+                    <button class="lxai-btn" type="button" aria-label="Stop talking about this record" t-on-click="() => this.chat.pin(null)">×</button>
+                </div>
 
                 <form class="lxai-ask" t-on-submit.prevent="submit">
                     <textarea t-ref="input" rows="1" t-model="ui.draft" t-on-keydown="onKeydown" placeholder="Ask a question…" aria-label="Your question"

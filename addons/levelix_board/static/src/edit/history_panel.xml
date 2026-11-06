@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.HistoryPanel">
+        <aside class="lxb-drill lxb-history" role="dialog" aria-label="History">
+            <header class="lxb-drill__head">
+                <div><div class="lxb-drill__title">History</div><div class="lxb-drill__sub">Every save is kept. Restoring adds a new version.</div></div>
+                <button class="lxb-icon-btn" aria-label="Close" t-on-click="props.onClose">✕</button>
+            </header>
+            <div class="lxb-drill__body">
+                <div t-if="state.loading" class="lxb-skeleton" aria-busy="true"/>
+                <div t-if="state.error" class="lxb-state lxb-state--error" role="alert"><div class="lxb-state__text" t-esc="state.error"/></div>
+                <ol class="lxb-versions">
+                    <li t-foreach="state.rows" t-as="row" t-key="row.version" class="lxb-version" t-att-data-version="row.version">
+                        <div class="lxb-version__head">
+                            <strong>Version <t t-esc="row.version"/></strong>
+                            <span t-if="row.current" class="lxb-chip">Current</span>
+                            <span class="lxb-chip lxb-chip--muted" t-esc="origin(row)"/>
+                        </div>
+                        <div class="lxb-note"><t t-esc="row.date"/> · <t t-esc="row.author"/> · <t t-esc="row.widgets"/> widgets</div>
+                        <div t-if="row.note" class="lxb-version__note" t-esc="row.note"/>
+                        <div class="lxb-version__changes" t-esc="summary(row)"/>
+                        <div t-if="!row.current" class="lxb-version__actions">
+                            <button t-if="state.confirm !== row.version" class="lxb-btn" t-on-click="() => state.confirm = row.version">Restore</button>
+                            <t t-else="">
+                                <span class="lxb-note">Make version <t t-esc="row.version"/> the current one?</span>
+                                <button class="lxb-btn lxb-btn--primary" t-att-disabled="state.busy" t-on-click="() => this.restore(row)">Yes, restore</button>
+                                <button class="lxb-btn lxb-btn--ghost" t-on-click="() => state.confirm = 0">No</button>
+                            </t>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </aside>
+    </t>
+</templates>

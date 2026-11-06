@@ -22,7 +22,8 @@ test("markdown: paragraphs, line breaks, lists, headings", () => {
     assert.equal(renderMarkdown("one\ntwo\n\nthree"), "<p>one<br>two</p><p>three</p>");
     assert.equal(renderMarkdown("- a\n- b"), "<ul><li>a</li><li>b</li></ul>");
     assert.equal(renderMarkdown("1. a\n2) b"), "<ol><li>a</li><li>b</li></ol>");
-    assert.equal(renderMarkdown("Intro\n- a\nOutro"), "<p>Intro</p><ul><li>a</li></ul><p>Outro</p>");
+    assert.equal(renderMarkdown("Intro\n- a\n- b\nOutro"), "<p>Intro</p><ul><li>a</li><li>b</li></ul><p>Outro</p>");
+    assert.equal(renderMarkdown("Done.\n\n* One more thing."), "<p>Done.</p><p>One more thing.</p>"); // a lone bullet is a sentence
     assert.equal(renderMarkdown("## Title"), "<p><strong>Title</strong></p>");
     assert.equal(renderMarkdown(""), "");
     assert.equal(renderMarkdown(null), "");

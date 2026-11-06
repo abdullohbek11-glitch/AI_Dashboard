@@ -5,3 +5,5 @@ access_ai_message_user,levelix.ai.message user,model_levelix_ai_message,group_ai
 access_ai_message_admin,levelix.ai.message admin,model_levelix_ai_message,base.group_system,1,0,0,0
 access_ai_tool_call_user,levelix.ai.tool.call user,model_levelix_ai_tool_call,group_ai_user,1,0,0,0
 access_ai_tool_call_admin,levelix.ai.tool.call admin,model_levelix_ai_tool_call,base.group_system,1,0,0,0
+access_ai_feedback_user,levelix.ai.feedback user,model_levelix_ai_feedback,group_ai_user,1,0,0,0
+access_ai_feedback_admin,levelix.ai.feedback admin,model_levelix_ai_feedback,base.group_system,1,1,0,0

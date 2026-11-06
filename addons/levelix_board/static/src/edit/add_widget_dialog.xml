@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.AddWidgetDialog">
+        <div class="lxb-modal" role="dialog" aria-label="Add a widget">
+            <div class="lxb-modal__box">
+                <header class="lxb-modal__head">
+                    <h2>Add a widget</h2>
+                    <button class="lxb-icon-btn" aria-label="Close" t-on-click="props.onClose">✕</button>
+                </header>
+                <div class="lxb-modal__body lxb-form">
+                    <label data-field="type">Type
+                        <select class="lxb-select" t-on-change="(ev) => this.changeType(ev.target.value)">
+                            <option t-foreach="types" t-as="type" t-key="type" t-att-value="type" t-att-selected="type === state.type" t-esc="type"/>
+                        </select>
+                    </label>
+                    <label data-field="title">Title
+                        <input class="lxb-input" maxlength="80" t-model="state.title" placeholder="New widget"/>
+                    </label>
+                    <label data-field="source">Data
+                        <select class="lxb-select" t-on-change="(ev) => this.pickSource(ev.target.value)">
+                            <option t-foreach="state.sources" t-as="source" t-key="source.model" t-att-value="source.model" t-att-selected="source.model === state.model" t-esc="source.label"/>
+                        </select>
+                    </label>
+                    <label t-if="state.fields and state.fields.state" data-field="status">Status
+                        <select class="lxb-select" t-on-change="(ev) => { state.status = ev.target.value; state.preview = null; }">
+                            <option value="">Any</option>
+                            <option t-foreach="state.fields.state.values" t-as="value" t-key="value[0]" t-att-value="value[0]" t-esc="value[1]"/>
+                        </select>
+                    </label>
+                    <t t-if="needsDimension">
+                        <label data-field="dim">
+                            <t t-if="state.type === 'heatmap'">Date (weekday by hour)</t>
+                            <t t-else="">Group by</t>
+                            <select class="lxb-select" t-on-change="(ev) => { state.dim = ev.target.value; state.preview = null; }">
+                                <option t-foreach="dimensionChoices" t-as="field" t-key="field.name" t-att-value="field.name" t-att-selected="field.name === state.dim" t-esc="field.label"/>
+                            </select>
+                        </label>
+                        <label t-if="state.type !== 'heatmap' and isDate(state.dim)" data-field="gran">By
+                            <select class="lxb-select" t-on-change="(ev) => { state.gran = ev.target.value; state.preview = null; }">
+                                <option t-foreach="granularities" t-as="g" t-key="g" t-att-value="g" t-att-selected="g === state.gran" t-esc="g"/>
+                            </select>
+                        </label>
+                    </t>
+                    <div class="lxb-form__row">
+                        <label data-field="measure1">Measure
+                            <select class="lxb-select" t-on-change="(ev) => this.pickMeasure(1, ev.target.value)">
+                                <option value="__count" t-att-selected="state.measure1 === '__count'">Count of records</option>
+                                <option t-foreach="measureChoices" t-as="field" t-key="field.name" t-att-value="field.name" t-att-selected="field.name === state.measure1" t-esc="field.label"/>
+                            </select>
+                        </label>
+                        <label t-if="state.measure1 !== '__count'" data-field="agg1">How
+                            <select class="lxb-select" t-on-change="(ev) => { state.agg1 = ev.target.value; state.preview = null; }">
+                                <option t-foreach="aggregatesOf(state.measure1)" t-as="agg" t-key="agg" t-att-value="agg" t-att-selected="agg === state.agg1" t-esc="agg"/>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="lxb-form__row" t-if="needsSecondMeasure">
+                        <label data-field="measure2">Second measure
+                            <select class="lxb-select" t-on-change="(ev) => this.pickMeasure(2, ev.target.value)">
+                                <option t-foreach="measureChoices" t-as="field" t-key="field.name" t-att-value="field.name" t-att-selected="field.name === state.measure2" t-esc="field.label"/>
+                            </select>
+                        </label>
+                        <label data-field="agg2">How
+                            <select class="lxb-select" t-on-change="(ev) => { state.agg2 = ev.target.value; state.preview = null; }">
+                                <option t-foreach="aggregatesOf(state.measure2)" t-as="agg" t-key="agg" t-att-value="agg" t-att-selected="agg === state.agg2" t-esc="agg"/>
+                            </select>
+                        </label>
+                    </div>
+                    <label t-if="state.type === 'gauge'" data-field="target">Target
+                        <input class="lxb-input" type="number" t-model="state.target" placeholder="e.g. 100000000"/>
+                    </label>
+
+                    <div t-if="state.error" class="lxb-state lxb-state--error" role="alert"><div class="lxb-state__text" t-esc="state.error"/></div>
+                    <div t-if="state.preview" class="lxb-preview">
+                        <div t-if="state.preview.error" class="lxb-state lxb-state--error" role="alert"><div class="lxb-state__text" t-esc="state.preview.error"/></div>
+                        <table t-else="" class="lxb-table">
+                            <thead><tr><th t-foreach="state.preview.columns" t-as="column" t-key="column_index" t-esc="column"/></tr></thead>
+                            <tbody><tr t-foreach="state.preview.rows" t-as="row" t-key="row_index"><td t-foreach="row" t-as="cell" t-key="cell_index" t-esc="cell"/></tr></tbody>
+                        </table>
+                        <div t-if="state.preview and state.preview.more" class="lxb-note">… and <t t-esc="state.preview.more"/> more rows</div>
+                    </div>
+                </div>
+                <footer class="lxb-modal__foot">
+                    <button class="lxb-btn" t-att-disabled="state.busy or !state.model" t-on-click="preview">Preview</button>
+                    <button class="lxb-btn lxb-btn--primary" t-att-disabled="!canAdd" t-on-click="add">Add to the dashboard</button>
+                </footer>
+            </div>
+        </div>
+    </t>
+</templates>

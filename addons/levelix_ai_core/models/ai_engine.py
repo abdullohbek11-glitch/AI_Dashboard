@@ -1,5 +1,6 @@
 """The conversation loop: history -> provider -> tool calls -> answer, streamed to the browser over the bus."""
 import json
+import re
 import logging
 import threading
 import time
@@ -20,6 +21,12 @@ from ..providers import PROVIDERS, ProviderError
 _logger = logging.getLogger(__name__)
 
 MAX_STEPS = 8  # model <-> tool round trips per question
+# what a model sometimes writes into its answer instead of keeping to the words: tool arguments and "(Chart shown)"
+LEAKS = re.compile(r"\s*\((?:show\s*=\s*\w+|(?:chart|table|kpi|number)\s+shown)\)|\s*\bshow\s*=\s*(?:none|chart|kpi|table)\b|^\s*\[(?:chart|table|kpi)\]\s*", re.I)
+# Output room for ONE model step. Reasoning models spend it on thinking before they write, and a dashboard of eight
+# widgets is a few thousand tokens of JSON by itself: a small budget ends in an empty or cut-off answer.
+MAX_OUTPUT_TOKENS = 16000
+LENGTH_STOPS = ("length", "max_tokens", "MAX_TOKENS")  # what the vendors call "ran out of room"
 HISTORY_TURNS = 10
 RESULT_CHARS = 12000  # what one tool result may weigh when it goes to the model
 FLUSH_EVERY = 0.12
@@ -63,7 +70,7 @@ class LevelixAiEngine(models.AbstractModel):
             temperature = None
         timeout = int(self._param("timeout", "120") or 120)
         return PROVIDERS[name](key, self._param(f"{name}_model") or None, self._param(f"{name}_base_url") or None,
-                               timeout=max(5, timeout), temperature=temperature)
+                               timeout=max(5, timeout), temperature=temperature, reasoning=self._param("reasoning", "low"))
 
     @api.model
     def _is_configured(self):
@@ -100,6 +107,17 @@ class LevelixAiEngine(models.AbstractModel):
     def _prompt_pieces(self):
         """Extra rules of other modules: ``return super()._prompt_pieces() + [MY_RULES]``."""
         return []
+
+    @api.model
+    def _prepared(self, text, conversation):
+        """Text the system adds after a question: what the model would otherwise fetch with extra tool calls (each one a
+        round trip). Extensions return ``super()._prepared(...) + their own``; empty by default."""
+        return ""
+
+    @api.model
+    def _finish_blocks(self, answer, blocks):
+        """The blocks of a finished answer. Other modules may add to them: ``return super()._finish_blocks(answer, blocks) + [...]``."""
+        return blocks
 
     @api.model
     def _context_line(self, context):
@@ -193,9 +211,10 @@ class LevelixAiEngine(models.AbstractModel):
             system = prompt.assemble(self._prompt_pieces())
             tools = Tools._available_tools()
             messages = self._history(answer)
+            room = max(1000, int(self._param("max_output_tokens") or MAX_OUTPUT_TOKENS))
             for _step in range(MAX_STEPS):
-                step_text, calls, buffer, last = "", [], "", time.monotonic()
-                for kind, value in provider.stream(system, messages, tools):
+                step_text, calls, buffer, last, stopped = "", [], "", time.monotonic(), ""
+                for kind, value in provider.stream(system, messages, tools, max_tokens=room):
                     if kind == "text":
                         step_text += value
                         buffer += value
@@ -207,8 +226,14 @@ class LevelixAiEngine(models.AbstractModel):
                     elif kind == "usage":
                         for key in usage:
                             usage[key] += value.get(key) or 0
+                    elif kind == "stop":
+                        stopped = value
                 if buffer:
                     self._send(answer, {"kind": "delta", "text": buffer})
+                if stopped in LENGTH_STOPS and (calls or not step_text):
+                    # cut off with nothing usable (or a tool call whose arguments are incomplete): never pretend it was an answer
+                    raise ProviderError(self.env._(
+                        "The assistant ran out of room before it could finish. Ask for less at once (fewer charts or fewer details) and try again."), "length")
                 content = ([{"type": "text", "text": step_text}] if step_text else []) + calls
                 if not content:
                     break
@@ -228,6 +253,8 @@ class LevelixAiEngine(models.AbstractModel):
                 text = text or self.env._("I could not finish this in a reasonable number of steps. Try a narrower question.")
             if not text and not blocks:
                 text = self.env._("I found nothing to answer that with.")
+            blocks = self._finish_blocks(answer, blocks)
+            text = LEAKS.sub("", text).strip() if blocks else text
             values = {"state": "done", "text": text, "blocks": blocks, "explain": explain, "llm_content": produced}
         except (ProviderError, UserError, AccessError) as error:
             values = {"state": "error", "error": str(error)[:500], "text": text}
@@ -270,10 +297,13 @@ class LevelixAiEngine(models.AbstractModel):
                 payload = payload[:RESULT_CHARS] + "… (truncated: narrow the query)"
             if side.get("block"):
                 blocks.append(side["block"])
+            blocks.extend(side.get("blocks") or [])
             if side.get("explain"):
                 explain.append(side["explain"])
             log.update({"record_count": side.get("count") or 0, "res_model": side.get("model") or log["res_model"]})
-            is_error = False
+            is_error = bool(side.get("error"))  # a tool may answer normally yet report a failed attempt (e.g. a spec that did not validate)
+            if is_error:
+                log["error"] = str(side["error"])[:200]
         except AccessError:
             payload, is_error = "Access denied: the current user is not allowed to do this.", True
         except pg_errors.QueryCanceled:
@@ -284,7 +314,7 @@ class LevelixAiEngine(models.AbstractModel):
             _logger.info("Levelix AI tool %s failed: %s", name, error)
             payload, is_error = f"Error: {type(error).__name__}: {error}"[:600], True
         log.update({
-            "result_size": len(payload), "is_error": is_error, "error": payload[:200] if is_error else False,
+            "result_size": len(payload), "is_error": is_error, "error": log.get("error") or (payload[:200] if is_error else False),
             "duration_ms": int((time.monotonic() - started) * 1000),
         })
         self.env["levelix.ai.tool.call"].sudo().create(log)  # the audit log is written by the server only

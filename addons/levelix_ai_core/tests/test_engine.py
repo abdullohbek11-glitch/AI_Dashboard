@@ -4,68 +4,11 @@ import logging
 
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import tagged
-from odoo.tests.common import TransactionCase, new_test_user
 
 from ..models import ai_engine
 from ..providers import PROVIDERS
-from .fake_ai import GOOD_KEY, FakeAI
-
-VENDORS = sorted(PROVIDERS)
-TZ = "Asia/Tashkent"
-
-
-class AiCase(TransactionCase):
-    """Common set-up: a fake vendor, three kinds of user, a few orders."""
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.ai = FakeAI().__enter__()
-        cls.addClassCleanup(cls.ai.__exit__)
-        env = cls.env
-        # a dev database may have "assistant for all internal users" switched on; the tests choose who may chat
-        env.ref("base.group_user").write({"implied_ids": [(3, env.ref("levelix_ai_core.group_ai_user").id)]})
-        cls.boss = new_test_user(env, "ai_boss", groups="base.group_user,levelix_ai_core.group_ai_user,sales_team.group_sale_manager")
-        cls.plain = new_test_user(env, "ai_plain", groups="base.group_user,levelix_ai_core.group_ai_user")  # may chat, may not read sales
-        cls.nobody = new_test_user(env, "ai_nobody", groups="base.group_user")  # may not chat
-        for user in (cls.boss, cls.plain, cls.nobody):
-            user.tz = TZ
-        cls.customer = env["res.partner"].create({"name": "AI test customer"})
-        cls.product = env["product.product"].create({"name": "AI test product", "list_price": 10, "type": "consu"})
-
-    def setUp(self):
-        super().setUp()
-        self.ai.requests.clear()
-        self.ai.server.script = None
-        self.use("anthropic")
-
-    def use(self, vendor, key=GOOD_KEY, **params):
-        """Point the assistant at the fake vendor with the given provider."""
-        set_param = self.env["ir.config_parameter"].sudo().set_param
-        set_param("levelix_ai.provider", vendor)
-        set_param(f"levelix_ai.{vendor}_key", key)
-        set_param(f"levelix_ai.{vendor}_base_url", self.ai.url)
-        for name, value in dict({"privacy": "aggregates", "daily_limit": "200", "daily_tokens": "0"}, **params).items():
-            set_param(f"levelix_ai.{name}", value)
-
-    def order(self, when="2024-03-10 10:00:00", partner=None, qty=1, price=10, confirm=True):
-        order = self.env["sale.order"].create({
-            "partner_id": (partner or self.customer).id, "date_order": when,
-            "order_line": [(0, 0, {"product_id": self.product.id, "product_uom_qty": qty, "price_unit": price})],
-        })
-        if confirm:
-            order.action_confirm()
-            order.date_order = when
-        return order
-
-    def ask(self, user, text, conversation=False, context=None):
-        Conversation = self.env["levelix.ai.conversation"].with_user(user)
-        sent = Conversation.lx_send(conversation, text, context)
-        answer = self.env["levelix.ai.message"].browse(sent["messages"][1]["id"])
-        return sent["conversation"]["id"], answer
-
-    def calls(self, answer):
-        return answer.sudo().tool_call_ids.sorted("id")
+from .fake_ai import GOOD_KEY, call, say, turn_results
+from .support import TZ, VENDORS, AiCase
 
 
 @tagged("post_install", "-at_install", "levelix_ai_core", "-standard")
@@ -95,7 +38,7 @@ class TestAssistant(AiCase):
         self.assertTrue(first.startswith("[context] today="), first)
         self.assertIn("user=%s" % self.boss.name, first)
         self.assertIn("company=%s" % self.boss.company_id.name, first)
-        self.assertEqual(set(request["tools"]), {"find_models", "describe_model", "search_records", "aggregate", "pick_record", "ask_user"})
+        self.assertLessEqual({"find_models", "describe_model", "search_records", "aggregate", "pick_record", "ask_user"}, set(request["tools"]))  # other modules may add more
 
     def test_the_next_question_carries_the_conversation(self):
         conversation, _first = self.ask(self.boss, "hello")
@@ -109,6 +52,80 @@ class TestAssistant(AiCase):
         self.assertEqual(len(self.calls(answer)), ai_engine.MAX_STEPS)
         self.assertEqual(answer.state, "done")
         self.assertIn("could not finish", answer.text)
+
+    def test_one_step_gets_room_for_thinking_and_a_big_dashboard(self):
+        for vendor in VENDORS:
+            with self.subTest(vendor=vendor):
+                self.use(vendor)
+                self.ai.requests.clear()
+                self.ask(self.boss, "hello")
+                raw = self.ai.requests[0]["raw"]
+                room = {"anthropic": raw.get("max_tokens"), "openai": raw.get("max_completion_tokens"),
+                        "gemini": (raw.get("generationConfig") or {}).get("maxOutputTokens")}[vendor]
+                self.assertEqual(room, ai_engine.MAX_OUTPUT_TOKENS)
+        self.env["ir.config_parameter"].sudo().set_param("levelix_ai.max_output_tokens", "4000")
+        self.ai.requests.clear()
+        self.ask(self.boss, "hello")
+        self.assertIn(4000, self.ai.requests[0]["raw"].values())  # an administrator can change it (anthropic is in use here)
+
+    def test_tool_words_a_model_leaks_into_its_answer_are_removed(self):
+        for leaked, clean in (("Here it is (show=chart).", "Here it is."), ("(Chart shown) Orders by weekday", "Orders by weekday"),
+                              ("Top 5 customers.\n\n(show=table)", "Top 5 customers."), ("[table]  Here are the orders", "Here are the orders"),
+                              ("A plain answer", "A plain answer")):
+            with self.subTest(leaked=leaked):
+                self.ai.server.script = lambda request, leaked=leaked: (
+                    call("aggregate", model="sale.order", domain="[]", aggregates=["__count"], show="kpi") if not turn_results(request) else say(request, leaked))
+                _c, answer = self.ask(self.boss, "count")
+                self.assertEqual(answer.text, clean)
+
+    def test_a_second_question_right_after_the_user_chose_is_refused(self):
+        options = ["Option A", "Option B"]
+        ask = lambda: call("ask_user", question="Which one?", options=options)  # noqa: E731
+        self.ai.server.script = lambda request: (
+            ask() if not turn_results(request) else say(request, "Proceeding with what you chose."))
+        conversation, first = self.ask(self.boss, "do it")
+        self.assertEqual([b["type"] for b in first.blocks], ["choices"])  # the first question is allowed
+        self.assertEqual(first.blocks[0]["kind"], "question")
+        _c, second = self.ask(self.boss, "Option A", conversation)  # a button press; the model asks AGAIN
+        call_row = self.calls(second)[0]
+        self.assertEqual((call_row.name, call_row.is_error), ("ask_user", True))
+        self.assertIn("just answered your question", call_row.error)
+        self.assertFalse(second.blocks)  # no second set of buttons
+        self.assertEqual(second.text, "Proceeding with what you chose.")
+
+    def test_a_typed_reply_is_not_mistaken_for_a_pressed_button(self):
+        ask = lambda: call("ask_user", question="Which one?", options=["Option A", "Option B"])  # noqa: E731
+        self.ai.server.script = lambda request: ask() if not turn_results(request) else say(request, "ok")
+        conversation, _first = self.ask(self.boss, "do it")
+        _c, other = self.ask(self.boss, "Actually, something else entirely", conversation)  # the user ignored the buttons
+        self.assertEqual([b["type"] for b in other.blocks], ["choices"])  # a new request may be asked about
+
+    def test_the_thinking_time_setting_reaches_the_vendor(self):
+        set_param = self.env["ir.config_parameter"].sudo().set_param
+        asked = lambda: self.ai.requests[0]["raw"]  # noqa: E731
+        self.use("openai")
+        self.ai.requests.clear()
+        self.ask(self.boss, "hello")
+        self.assertEqual(asked().get("reasoning_effort"), "low")  # fast unless an administrator says otherwise
+        for value, expected in (("high", "high"), ("minimal", "minimal"), ("default", None)):
+            with self.subTest(value=value):
+                set_param("levelix_ai.reasoning", value)
+                self.ai.requests.clear()
+                self.ask(self.boss, "hello")
+                self.assertEqual(asked().get("reasoning_effort"), expected)
+
+    def test_an_answer_cut_off_by_the_output_limit_is_an_error_not_an_empty_answer(self):
+        for vendor in VENDORS:
+            with self.subTest(vendor=vendor):
+                self.use(vendor)
+                self.ai.server.script = lambda request: [("cut", None)]
+                _c, answer = self.ask(self.boss, "build me everything")
+                self.assertEqual(answer.state, "error")
+                self.assertIn("ran out of room", answer.error)
+                self.assertNotIn("found nothing", answer.text or "")
+        self.ai.server.script = lambda request: [("text", "A long answer that was cut"), ("cut", None)]
+        _c, answer = self.ask(self.boss, "tell me a lot")
+        self.assertEqual((answer.state, answer.text), ("done", "A long answer that was cut"))  # words that arrived are kept
 
     def test_a_vendor_failure_is_told_plainly(self):
         for key, needle in (("bad-key", "refused the API key"), ("limit-key", "rate limit"), ("down-key", "having trouble")):
@@ -310,3 +327,61 @@ class TestAssistant(AiCase):
         self.use("anthropic", key="bad-key")  # the error path too
         _c, failed = self.ask(self.boss, "hello")
         self.assertNotIn("bad-key", json.dumps(failed.read(["error", "text"]), default=str))
+
+
+@tagged("post_install", "-at_install", "levelix_ai_core", "-standard")
+class TestFeedback(AiCase):
+    def test_a_wrong_answer_is_kept_with_its_question_and_what_was_done(self):
+        _c, answer = self.ask(self.boss, "How many sales orders are there?")
+        out = self.env["levelix.ai.conversation"].with_user(self.boss).lx_feedback(answer.id, "  should be this month only ")
+        self.assertTrue(out["saved"])
+        row = self.env["levelix.ai.feedback"].sudo().search([("message_id", "=", answer.id)])
+        self.assertEqual((row.question, row.note, row.verdict, row.privacy), ("How many sales orders are there?", "should be this month only", "wrong", "aggregates"))
+        self.assertEqual([c["name"] for c in row.calls], ["aggregate"])
+        self.assertEqual([t for t in row.block_types if t != "save_offer"], ["kpi"])  # an installed extension may add its own buttons
+        self.assertTrue(answer._lx_payload()["marked"])
+
+    def test_marking_twice_only_updates_the_note(self):
+        _c, answer = self.ask(self.boss, "hello")
+        Conversation = self.env["levelix.ai.conversation"].with_user(self.boss)
+        Conversation.lx_feedback(answer.id, "first")
+        Conversation.lx_feedback(answer.id, "second")
+        rows = self.env["levelix.ai.feedback"].sudo().search([("message_id", "=", answer.id)])
+        self.assertEqual((len(rows), rows.note), (1, "second"))
+
+    def test_only_your_own_answers_can_be_marked_and_the_log_cannot_be_forged(self):
+        _c, answer = self.ask(self.boss, "hello")
+        with self.assertRaises(AccessError):
+            self.env["levelix.ai.conversation"].with_user(self.plain).lx_feedback(answer.id)
+        with self.assertRaises(AccessError):
+            self.env["levelix.ai.feedback"].with_user(self.boss).create({"message_id": answer.id, "question": "forged"})
+        for bad in (None, True, "1", 5.5, 999999999):  # not an id, or an answer that does not exist
+            with self.subTest(message=bad), self.assertRaises(UserError):
+                self.env["levelix.ai.conversation"].with_user(self.boss).lx_feedback(bad)
+        with self.assertRaises(UserError):
+            self.env["levelix.ai.conversation"].with_user(self.boss).lx_feedback(answer.id, "x" * 501)
+
+    def test_a_question_cannot_be_marked(self):
+        conversation, answer = self.ask(self.boss, "hello")
+        question = self.env["levelix.ai.message"].sudo().search([("conversation_id", "=", conversation), ("role", "=", "user")])
+        with self.assertRaises(UserError):
+            self.env["levelix.ai.conversation"].with_user(self.boss).lx_feedback(question.id)
+
+    def test_a_tool_that_reports_a_failed_attempt_is_logged_as_failed(self):
+        from ..models import ai_tools
+        original = ai_tools.LevelixAiTools._tool_ask_user
+
+        def failing(self, args, message):
+            result, side = original(self, args, message)
+            side["error"] = "it did not validate"
+            return result, side
+
+        ai_tools.LevelixAiTools._tool_ask_user = failing
+        try:
+            self.ai.server.script = lambda request: ([("tool_use", {"type": "tool_use", "id": "x1", "name": "ask_user", "input": {"question": "Which?", "options": ["a", "b"]}})]
+                                                     if not any(b["type"] == "tool_result" for _r, bl in request["messages"] for b in bl) else [("text", "ok")])
+            _c, answer = self.ask(self.boss, "go")
+        finally:
+            ai_tools.LevelixAiTools._tool_ask_user = original
+        call = self.calls(answer)
+        self.assertEqual((call.is_error, call.error), (True, "it did not validate"))

@@ -6,7 +6,7 @@ from .base import Provider, sse
 class Gemini(Provider):
     name = "gemini"
     label = "Google Gemini"
-    default_model = "gemini-2.5-flash"
+    default_model = "gemini-3.6-flash"
     base_url = "https://generativelanguage.googleapis.com/v1beta"
 
     def _contents(self, messages):
@@ -26,10 +26,18 @@ class Gemini(Provider):
             out.append({"role": "model" if message["role"] == "assistant" else "user", "parts": parts})
         return out
 
+    def _thinking(self):
+        """Gemini 3 names a level; the 2.5 family takes a budget of tokens."""
+        if "gemini-3" in self.model:
+            return {"thinkingLevel": self.reasoning}
+        return {"thinkingBudget": {"minimal": 0, "low": 512, "medium": 2048, "high": 8192}[self.reasoning]}
+
     def stream(self, system, messages, tools, max_tokens=2048):
         config = {"maxOutputTokens": max_tokens}
         if self.temperature is not None:
             config["temperature"] = self.temperature
+        if self.reasoning:
+            config["thinkingConfig"] = self._thinking()
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": self._contents(messages),

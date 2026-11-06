@@ -18,7 +18,7 @@ MAX_IMPORTANT = 5
 
 _AGG_WORD = {
     "sum": "total", "avg": "average", "min": "smallest", "max": "largest",
-    "count": "count", "count_distinct": "number of different values",
+    "count": "count", "count_distinct": "number of different values", "calc": "calculated from the other measures",
 }
 _GRANULARITY_WORD = {"day": "day", "week": "week", "month": "month", "quarter": "quarter", "year": "year"}
 _OPERATOR_WORD = {
@@ -38,11 +38,14 @@ class ExplainBuilder:
         """``resolve_names(model, ids) -> [names]`` turns record ids in filters into names."""
         self.resolve_names = resolve_names
 
-    def build(self, widget: Widget, model: ModelInfo, plan: Plan, currency=None, warnings=()) -> list:
+    def build(self, widget: Widget, model: ModelInfo, plan: Plan, currency=None, warnings=(), note=None) -> list:
         lines = [_line("source", t("Data source: %s.") % model.label, False)]
         lines += self._measures(plan, currency)
+        if note:  # e.g. "Amounts: with tax." from the dashboard's Amounts switch
+            lines.append(_line("basis", note, True))
         lines += self._dimensions(plan)
         lines += self._filters(widget, model, plan)
+        lines += self._compare(plan)
         lines += self._cut(plan)
         for warning in warnings:
             lines.append(_line("warning", warning.text if hasattr(warning, "text") else warning["text"], True))
@@ -117,6 +120,13 @@ class ExplainBuilder:
         elif info is not None and info.type == "boolean":
             values = [t("Yes") if v else t("No") for v in values]
         return ", ".join(str(v) for v in values)
+
+    def _compare(self, plan: Plan) -> list:
+        if plan.compare is None:
+            return []
+        kind = t("the previous year") if plan.compare.kind == "previous_year" else t("the previous period")
+        last = plan.compare.end_excl - timedelta(days=1)
+        return [_line("compare", t("Compared with %s (%s – %s).") % (kind, plan.compare.start.isoformat(), last.isoformat()), True)]
 
     def _cut(self, plan: Plan) -> list:
         if plan.top_n is None:

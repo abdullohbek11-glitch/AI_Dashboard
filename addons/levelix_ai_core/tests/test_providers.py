@@ -146,3 +146,43 @@ class TestProviders(BaseCase):
                 run(PROVIDERS["anthropic"](GOOD_KEY, base_url=self.ai.url, timeout=7, retries=0), ASK)
         self.assertEqual(post.call_args.kwargs["timeout"], (10, 7))
         self.assertIn("timed out", str(ctx.exception))
+
+
+@tagged("levelix_ai_core", "-standard")
+class TestThinkingTime(BaseCase):
+    """How long a thinking model may think is sent where it means something and nowhere else."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.ai = FakeAI().__enter__()
+        cls.addClassCleanup(cls.ai.__exit__)
+
+    def setUp(self):
+        super().setUp()
+        self.ai.requests.clear()
+
+    def sent(self, vendor, model, reasoning):
+        run(make(vendor, self.ai.url, model=model, reasoning=reasoning), ASK)
+        return self.ai.requests[-1]["raw"]
+
+    def test_openai_reasoning_models_get_the_effort(self):
+        for model in ("gpt-5-mini", "gpt-5", "o4-mini"):
+            self.assertEqual(self.sent("openai", model, "low").get("reasoning_effort"), "low", model)
+        for model in ("gpt-4.1", "gpt-4o-mini"):  # a model that does not think would reject it
+            self.assertNotIn("reasoning_effort", self.sent("openai", model, "low"), model)
+
+    def test_gemini_names_a_level_or_a_budget(self):
+        self.assertEqual(self.sent("gemini", "gemini-3.6-flash", "low")["generationConfig"]["thinkingConfig"], {"thinkingLevel": "low"})
+        self.assertEqual(self.sent("gemini", "gemini-2.5-flash", "low")["generationConfig"]["thinkingConfig"], {"thinkingBudget": 512})
+        self.assertEqual(self.sent("gemini", "gemini-2.5-flash", "minimal")["generationConfig"]["thinkingConfig"], {"thinkingBudget": 0})
+
+    def test_nothing_is_sent_without_a_valid_level(self):
+        for reasoning in (None, "", "default", "banana", 5):
+            with self.subTest(reasoning=reasoning):
+                self.assertNotIn("reasoning_effort", self.sent("openai", "gpt-5-mini", reasoning))
+                self.assertNotIn("thinkingConfig", self.sent("gemini", "gemini-3.6-flash", reasoning)["generationConfig"])
+
+    def test_anthropic_has_nothing_to_set(self):
+        raw = self.sent("anthropic", "claude-sonnet-5-5", "low")
+        self.assertFalse({"reasoning_effort", "thinking", "thinkingConfig"} & set(raw))

@@ -28,6 +28,12 @@ class ResConfigSettings(models.TransientModel):
                                    help="How long to wait for the provider's answer before giving up.")
     lx_ai_temperature = fields.Char("Temperature", config_parameter="levelix_ai.temperature",
                                     help="Leave empty for the vendor's default. Low values (0 to 0.2) give steadier answers.")
+    lx_ai_reasoning = fields.Selection(
+        [("minimal", "Fastest"), ("low", "Fast (recommended)"), ("medium", "Balanced"), ("high", "Most careful"), ("default", "Provider's own default (slowest)")],
+        string="Thinking Time", config_parameter="levelix_ai.reasoning", default="low",
+        help="How long a thinking model (OpenAI GPT-5, Gemini 3) may think before each step. Shorter is much faster: on a typical question "
+             "'Fast' answered in a third of the time of the provider's default. 'Fastest' can slip on subtle points (for example counting "
+             "order lines instead of orders). Models that do not think ignore this.")
     lx_ai_privacy = fields.Selection(
         [("aggregates", "Share totals and search results"), ("schema", "Share structure only")],
         string="Privacy Mode", config_parameter="levelix_ai.privacy", default="aggregates",

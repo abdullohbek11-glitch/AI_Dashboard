@@ -41,13 +41,13 @@ Qoidalar:
 | Faza | Nomi | Hajmi | Holat |
 |---|---|---|---|
 | F0 | Tayyorgarlik va prototip tekshiruvi | S | ✅ yopildi 2026-11-05 (`notes/F0_natijalar.md`) |
-| F1 | Spec va so'rov ijrochisi (faqat backend) | L | 🟦 qabul kutilmoqda (`notes/F1_natijalar.md`) |
-| F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | 🟦 qabul kutilmoqda (`notes/F2_natijalar.md`) |
-| F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | 🟦 qabul kutilmoqda (`notes/F3_natijalar.md`) |
-| F4 | `levelix_ai_core`: AI poydevori va chat | L | 🟦 qabul kutilmoqda (`notes/F4_natijalar.md`; haqiqiy kalit bilan sinovlar `DEFERRED.md` da) |
-| F5 | `levelix_ai_board`: chatdan dashboard | L | ⬜ |
-| F6 | Qolgan grafik turlari, filtrlar, taqqoslash | L | ⬜ |
-| F7 | Tahrirlash, versiyalar, ulashish | M | ⬜ |
+| F1 | Spec va so'rov ijrochisi (faqat backend) | L | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F1_natijalar.md`) |
+| F2 | Dashboard modeli, saqlash, huquq, drill (backend) | M | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F2_natijalar.md`) |
+| F3 | Frontend: dizayn, 4 vidjet, drill jadvali | L | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F3_natijalar.md`) |
+| F4 | `levelix_ai_core`: AI poydevori va chat | L | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F4_natijalar.md`; haqiqiy kalit bilan sinovlar `DEFERRED.md` da) |
+| F5 | `levelix_ai_board`: chatdan dashboard | L | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F5_natijalar.md`; oltin to'plam o'lchovi va haqiqiy model sinovlari `DEFERRED.md` da) |
+| F6 | Qolgan grafik turlari, filtrlar, taqqoslash | L | ✅ qabul qilindi 2026-11-06 (F7 ga o'tildi) (`notes/F6_natijalar.md`; haqiqiy modelda heatmap so'rovi `DEFERRED.md` da) |
+| F7 | Tahrirlash, versiyalar, ulashish | M | 🟦 qabul kutilmoqda (`notes/F7_natijalar.md`; haqiqiy model bilan 2 ta sinov o'tdi) |
 | F8 | Qo'shimcha funksiyalar (ogohlantirish, yuborish, TV …) | L | ⬜ |
 | F9 | Yakun: tarjima, migratsiya, ishlash tezligi, image | M | ⬜ |
 
@@ -335,15 +335,22 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Ishlar
 
-- [ ] Vositalar: `get_hints`, `preview_widget`, `build_dashboard`, `ask_user` (T4.3).
-- [ ] Tuzatish sikli: strukturaviy xato `[{path, code, message}]` AI ga qaytadi, ko'pi bilan 3 urinish, keyin halol xabar (T4.4).
-- [ ] Hint reyestri `levelix.ai.hint` + dastlabki yozuvlar: sotuv, xarid, faktura, kassa (T7.3). Ombor/qarzdorlik/CRM hint'lari faqat **tekshirilib** yoziladi.
-- [ ] Prompt qoidalari: hisobot modeli afzal, `assumptions[]`, `uncertain[]` + tayyor patch, nisbiy sanalar, texnik nom ko'rsatilmaydi (T4.6).
-- [ ] Chatda bloklar: `board_draft` (qoralama) va `board_explain` ("Men nima qildim"), tugmalar [Saqlash] [O'zgartir] (T8.5).
-- [ ] `uncertain[]` tugmalari: bosilganda patch AI siz qo'llanadi.
-- [ ] **"Noto'g'ri" tugmasi:** holat jurnalga yoziladi, keyin oltin to'plamga qo'shiladi.
-- [ ] `golden/`: savollar + kutilgan model/o'lchov/filtr + **Odoo standart hisobotidan olingan to'g'ri raqam**. Ishga tushirish buyrug'i (T12).
-- [ ] `levelix.board` ga `source_conversation_id` (`_inherit`).
+- [x] Vositalar: `get_hints`, `preview_widget`, `build_dashboard`, `ask_user` (T4.3).
+- [x] Tuzatish sikli: strukturaviy xato `[{path, code, message}]` AI ga qaytadi, ko'pi bilan 3 urinish, keyin halol xabar (T4.4).
+- [x] Hint reyestri `levelix.ai.hint` + dastlabki yozuvlar: sotuv, xarid, faktura, kassa (T7.3). Ombor/qarzdorlik/CRM hint'lari faqat **tekshirilib** yoziladi.
+- [x] Prompt qoidalari: hisobot modeli afzal, `assumptions[]`, `uncertain[]` + tayyor patch, nisbiy sanalar, texnik nom ko'rsatilmaydi (T4.6).
+- [x] Chatda bloklar: `board_draft` (qoralama) va `board_explain` ("Men nima qildim"), tugmalar [Saqlash] [O'zgartir] (T8.5).
+- [x] `uncertain[]` tugmalari: bosilganda patch AI siz qo'llanadi.
+- [x] **"Noto'g'ri" tugmasi:** holat jurnalga yoziladi, keyin oltin to'plamga qo'shiladi.
+- [x] `golden/`: savollar + kutilgan model/o'lchov/filtr + **Odoo standart hisobotidan olingan to'g'ri raqam**. Ishga tushirish buyrug'i (T12).
+- [x] `levelix.board` ga `source_conversation_id` (`_inherit`).
+
+### Natija (2026-11-05)
+
+- **[A]** Python 190 + 76 + 43, JS 35 yashil. Soxta vendor "yaxshi model"ni o'ynaydi (hint → describe → preview → build, xatoni tuzatish, umidsiz holat, mavjud bo'lmagan ma'lumot).
+- **[U]** `scripts/f5_ui_browser.py`: 13 tekshiruv, hammasi o'tdi (1–10 qadamlar).
+- **[G]** Oltin to'plam: 30 savol qoralamasi (`golden/questions.json`, **siz tuzatasiz**) va ishga tushirgich `scripts/run_golden.py` tayyor va soxta vendor bilan sinalgan. **Birinchi o'lchov haqiqiy kalit kerak qiladi: ochiq (`DEFERRED.md`).**
+- Batafsil: `notes/F5_natijalar.md`.
 
 ### Avtomatik test **[A]**
 
@@ -374,9 +381,9 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Tugadi, agar
 
-- **[A]** yashil; UI testi 1–10 o'tdi.
-- Oltin to'plamning birinchi natijasi o'lchangan va `notes/` da turibdi.
-- **TZ 2-bosqich qabul mezoni:** savol yozilsa qoralama chiqadi, xato bo'lsa o'zi tuzatadi.
+- **[A]** yashil ✅; UI testi 1–10 o'tdi ✅ (soxta vendor bilan).
+- Oltin to'plamning birinchi natijasi o'lchangan va `notes/` da turibdi ⬜ (kalit kerak, `DEFERRED.md`).
+- **TZ 2-bosqich qabul mezoni:** savol yozilsa qoralama chiqadi, xato bo'lsa o'zi tuzatadi ✅ (soxta modelda: mexanizm; haqiqiy modelda ⬜).
 
 ---
 
@@ -387,15 +394,15 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Ishlar
 
-- [ ] Vidjetlar: `pie`, `heatmap` (hafta kuni × soat), `funnel`, `treemap`, `gauge`, `waterfall`, `scatter`, `combo` (T5.2). Har biri: papka + reyestr yozuvi + Python tomonida shakl qoidasi (`BAD_SHAPE`).
-- [ ] Doira 8 tadan ko'p bo'lak bo'lsa avtomatik top 7 + "Boshqalar".
-- [ ] Global filtrlar: `date_range`, `company`, `select`; `applies_to` xaritasi (T5.3).
-- [ ] Cross-filter: bitta grafikni bosish qolganlarini filtrlaydi (vaqtinchalik, saqlanmaydi).
-- [ ] `compare`: `previous_period` / `previous_year` (F0 spike natijasiga ko'ra).
-- [ ] Hisoblangan o'lchovlar `calc` (o'z parser, `eval` yo'q) (T6.5).
-- [ ] `others` va `having` to'liq.
-- [ ] `fill_gaps`.
-- [ ] AI uchun: yangi turlar prompt va validator'ga qo'shiladi, `levelix_ai_board` yangilanadi.
+- [x] Vidjetlar: `pie`, `heatmap` (hafta kuni × soat), `funnel`, `treemap`, `gauge`, `waterfall`, `scatter`, `combo` (T5.2). Har biri: papka + reyestr yozuvi + Python tomonida shakl qoidasi (`BAD_SHAPE`).
+- [x] Doira 8 tadan ko'p bo'lak bo'lsa avtomatik top 7 + "Boshqalar".
+- [x] Global filtrlar: `date_range`, `company`, `select`; `applies_to` xaritasi (T5.3).
+- [x] Cross-filter: bitta grafikni bosish qolganlarini filtrlaydi (vaqtinchalik, saqlanmaydi).
+- [x] `compare`: `previous_period` / `previous_year` (F0 spike natijasiga ko'ra).
+- [x] Hisoblangan o'lchovlar `calc` (o'z parser, `eval` yo'q) (T6.5).
+- [x] `others` va `having` to'liq.
+- [x] `fill_gaps`.
+- [x] AI uchun: yangi turlar prompt va validator'ga qo'shiladi, `levelix_ai_board` yangilanadi.
 
 ### Avtomatik test **[A]**
 
@@ -420,8 +427,8 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Tugadi, agar
 
-- UI testi o'tdi; TZ 3-bosqich mezoni: **10 xil tur ishlaydi**, taqqoslash va filtrlar tekshirilgan.
-- Oltin to'plam qayta ishga tushirildi, regressiya yo'q.
+- UI testi o'tdi ✅ (`scripts/f6_ui_browser.py`, 15 tekshiruv); TZ 3-bosqich mezoni: **13 xil tur ishlaydi** ✅, taqqoslash va filtrlar tekshirilgan ✅.
+- Oltin to'plam qayta ishga tushirildi, regressiya yo'q ⬜ (haqiqiy kalit va tuzatilgan savollar kerak, `DEFERRED.md`).
 
 ---
 
@@ -432,18 +439,18 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Qaror kerak
 
-- Ulashish darajalari (TZ ochiq masala 3): faqat o'zi / guruh / butun kompaniya. Ochiq havola v1 da **yo'q**.
+- Ulashish darajalari (TZ ochiq masala 3): faqat o'zi / guruh / butun kompaniya. Ochiq havola v1 da **yo'q**. ✅ foydalanuvchi tasdiqladi: uchala daraja.
 
 ### Ishlar
 
-- [ ] Qo'lda tahrirlash: vidjetni surish, o'lcham o'zgartirish, o'chirish, sarlavha, turni almashtirish.
-- [ ] Vidjet qo'shish (turini tanlab, maydon tanlash oynasi, AI siz).
-- [ ] `update_dashboard` va `lx_apply_patch`: cheklangan patch (`add`/`replace`/`remove`, faqat `/widgets`, `/filters`, `/title`), vidjet `id` lari saqlanadi (T7.2).
-- [ ] Suhbat orqali tahrirlash: "ustunli qil", "oxirgi 3 oy", "qarzdorlarni ham qo'sh".
-- [ ] Versiya tarixi, `lx_restore`, versiyalarni solishtirish ro'yxati.
-- [ ] Ulashish: `lx_share`, ko'ruvchi o'z huquqi bilan ko'radi.
-- [ ] Nusxalash (clone), arxivlash.
-- [ ] Eksport: PNG (keyingi fazada PDF/XLSX).
+- [x] Qo'lda tahrirlash: vidjetni surish, o'lcham o'zgartirish, o'chirish, sarlavha, turni almashtirish.
+- [x] Vidjet qo'shish (turini tanlab, maydon tanlash oynasi, AI siz).
+- [x] `update_dashboard` va `lx_apply_patch`: cheklangan patch (`add`/`replace`/`remove`, faqat `/widgets`, `/filters`, `/title`), vidjet `id` lari saqlanadi (T7.2).
+- [x] Suhbat orqali tahrirlash: "ustunli qil", "oxirgi 3 oy", "qarzdorlarni ham qo'sh".
+- [x] Versiya tarixi, `lx_restore`, versiyalarni solishtirish ro'yxati.
+- [x] Ulashish: `lx_share`, ko'ruvchi o'z huquqi bilan ko'radi.
+- [x] Nusxalash (clone), arxivlash.
+- [x] Eksport: PNG (keyingi fazada PDF/XLSX).
 
 ### Avtomatik test **[A]**
 
@@ -467,11 +474,13 @@ Bu fazada UI yo'q. Qo'lda tekshiruv `odoo shell` orqali: T5.1 dagi spec'ni `run_
 
 ### Tugadi, agar
 
-- UI testi o'tdi; TZ 4-bosqich mezoni: **"ustunli qil" ishlaydi, orqaga qaytarish mumkin, ulashishda ko'ruvchi o'z huquqi bilan ko'radi**.
+- Batafsil: `notes/F7_natijalar.md`. UI testi o'tdi (1–8 brauzerda, 2 va 3 haqiqiy modelda); TZ 4-bosqich mezoni: **"ustunli qil" ishlaydi, orqaga qaytarish mumkin, ulashishda ko'ruvchi o'z huquqi bilan ko'radi**.
 
 ---
 
 ## F8. Qo'shimcha funksiyalar
+
+**Qarorlar (2026-11-06, foydalanuvchi):** barcha 8 ta funksiya qilinadi; tartib: (1) F8.1 + F8.2, (2) F8.3 + F8.5, (3) F8.6 + F8.7, (4) F8.4 + F8.8. Rejali yuborish: **PDF, raqamlar + oddiy SVG grafiklar** serverda `wkhtmltopdf` bilan (murakkab turlar jadval ko'rinishida; Chrome o'rnatilmaydi). Kanallar: **Odoo ichki bildirishnoma, Telegram, Email**. Telegram bot tokenini foydalanuvchi o'zi sozlamaga kiritadi.
 
 **Maqsad:** TZ 11-bo'limdagi foydali qo'shimchalar. Har biri alohida kichik qadam, har biri alohida test qilinadi va alohida yopiladi. Tartibni siz belgilaysiz.
 

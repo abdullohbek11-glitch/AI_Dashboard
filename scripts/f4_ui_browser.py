@@ -58,8 +58,12 @@ def vendor_log():
 def open_menu(page, entry, app="Levelix AI"):
     page.goto(base.BASE + "/odoo")
     page.wait_for_selector(".o_navbar", timeout=20000)
-    page.click(".o_menu_toggle, .o_navbar_apps_menu button")
-    page.click(".o-dropdown-item:has-text('%s'), a:has-text('%s')" % (app, app))
+    try:  # the M-Dom home screen (main_menu_animated) lists the apps as tiles
+        page.wait_for_selector(".o_home_menu", timeout=4000)
+        page.click(".o_home_menu >> text=%s" % app)
+    except base.PlaywrightTimeout:  # the standard apps dropdown
+        page.click(".o_menu_toggle, .o_navbar_apps_menu button")
+        page.click(".o-dropdown-item:has-text('%s'), a:has-text('%s')" % (app, app))
     if entry:
         page.click(".o_menu_sections a:has-text('%s'), .o_menu_sections button:has-text('%s')" % (entry, entry))
 

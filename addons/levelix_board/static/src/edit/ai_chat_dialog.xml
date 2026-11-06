@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="levelix_board.AiChatDialog">
+        <div class="lxb-modal" role="dialog" aria-label="Change with AI" t-on-click.self="props.onClose">
+            <div class="lxb-modal__box lxb-modal__box--narrow">
+                <div class="lxb-modal__body lxb-choice">
+                    <button class="lxb-btn lxb-btn--primary" data-action="continue-chat" t-on-click="() => props.onPick(props.chats[0])">Old chat</button>
+                    <button class="lxb-btn" data-action="new-chat" t-on-click="() => props.onPick(null)">New chat</button>
+                </div>
+            </div>
+        </div>
+    </t>
+</templates>

@@ -151,9 +151,116 @@ class TestValidator(BaseCase):
         self.assertEqual(self.codes(_type="bar", dimensions=[{"field": "date", "granularity": "hour_number"}], fill_gaps=True), ["BAD_SHAPE"])
         self.assertEqual(self.codes(_type="area", dimensions=day, fill_gaps=True, order={"by": "m1"}), ["BAD_SHAPE"])
 
-    def test_not_available_yet(self):
-        self.assertEqual(self.codes(compare="previous_period"), ["UNSUPPORTED"])
-        self.assertEqual(self.codes(measures=[{"id": "m1", "calc": "m2 - m3"}]), ["UNSUPPORTED"])
+    # -- calculated measures ---------------------------------------------------
+
+    MARGIN = [{"id": "m1", "field": "price_subtotal", "agg": "sum"}, {"id": "m2", "field": "product_uom_qty", "agg": "sum"}]
+
+    def calc(self, formula, **extra):
+        return self.codes(measures=self.MARGIN + [dict({"id": "m3", "calc": formula}, **extra)], _type="table", dimensions=[{"field": "product_id"}])
+
+    def test_a_calculated_measure_is_arithmetic_over_the_queried_ones(self):
+        self.assertEqual(self.calc("m1 - m2"), [])
+        self.assertEqual(self.calc("(m1 + m2) / 2 * 100", label="Mix", format="percent"), [])
+        self.assertEqual(self.calc("m1 / m2"), [])  # a zero divisor is a missing value at run time, not an error
+
+    def test_a_calculated_measure_is_checked_before_it_runs(self):
+        self.assertEqual(self.calc("m1 - nope"), ["UNKNOWN_MEASURE"])
+        self.assertEqual(self.calc("m1 - m3"), ["BAD_CALC"])  # not itself
+        for bad in ("m1 +", "m1 ** 2", "__import__('os')", "m1 m2", "   "):
+            with self.subTest(formula=bad):
+                self.assertEqual(self.calc(bad), ["BAD_CALC"])
+        self.assertEqual(self.codes(_type="table", dimensions=[{"field": "product_id"}],
+                                    measures=self.MARGIN + [{"id": "m3", "calc": "m1 - m2", "field": "price_subtotal"}]), ["BAD_CALC"])
+        message = self.check(_type="table", dimensions=[{"field": "product_id"}], measures=self.MARGIN + [{"id": "m3", "calc": "m1 + $"}]).errors[0].detail
+        self.assertIn("at character 5", message)
+
+    def test_a_calculated_measure_cannot_sort_or_filter_the_query(self):
+        measures = self.MARGIN + [{"id": "m3", "calc": "m1 - m2"}]
+        table = {"_type": "table", "dimensions": [{"field": "product_id"}], "measures": measures}
+        self.assertEqual(self.codes(order={"by": "m3", "dir": "desc"}, **table), ["BAD_ORDER"])
+        self.assertEqual(self.codes(having=[["m3", ">", 0]], **table), ["BAD_HAVING"])
+        self.assertEqual(self.codes(order={"by": "m1", "dir": "desc"}, **table), [])
+
+    # -- comparison ----------------------------------------------------------------
+
+    PERIOD = [["state", "=", "sale"], ["date", ">=", "today =1d"]]
+
+    def test_a_comparison_is_for_numbers_and_date_series(self):
+        day = [{"field": "date", "granularity": "day"}]
+        self.assertEqual(self.codes(compare="previous_period", domain=self.PERIOD), [])  # a KPI
+        self.assertEqual(self.codes(compare="previous_year", domain=self.PERIOD, _type="area", dimensions=day, fill_gaps=True), [])
+        self.assertEqual(self.codes(compare="last_week", domain=self.PERIOD), ["BAD_COMPARE"])
+        self.assertEqual(self.codes(compare="previous_period", domain=self.PERIOD, _type="bar", dimensions=[{"field": "product_id"}]), ["BAD_SHAPE", "BAD_SHAPE"])
+        self.assertEqual(self.codes(compare="previous_period", domain=self.PERIOD, _type="area", dimensions=day), ["BAD_SHAPE"])  # needs fill_gaps
+        self.assertEqual(self.codes(compare="previous_period", domain=self.PERIOD, _type="table", dimensions=[{"field": "product_id"}]), ["BAD_SHAPE", "BAD_SHAPE"])
+        self.assertEqual(self.codes(compare="previous_period", domain=["|", ["state", "=", "sale"], ["state", "=", "draft"]]), ["COMPARE_NO_PERIOD"])
+        two = [{"field": "date", "granularity": "day"}, {"field": "product_id"}]
+        self.assertIn("BAD_SHAPE", self.codes(compare="previous_period", domain=self.PERIOD, _type="area", dimensions=two, fill_gaps=True))
+
+    def test_a_comparison_without_a_start_date_is_warned_about(self):
+        result = self.check(compare="previous_period", domain=[["state", "=", "sale"]])
+        self.assertEqual(result.errors, [])
+        self.assertEqual([w.code for w in result.warnings], ["COMPARE_NO_PERIOD"])
+        self.assertEqual(self.check(compare="previous_period", domain=self.PERIOD).warnings, [])
+
+    def test_a_dashboard_period_supplies_the_start_date_of_a_comparison(self):
+        period = [{"id": "p", "type": "date_range", "label": "P", "applies_to": {"sale.report": "date"}}]
+        w = widget(compare="previous_period", domain=[["state", "=", "sale"]])
+        self.assertEqual([x.code for x in self.validator.validate_widget(w).warnings], ["COMPARE_NO_PERIOD"])
+        self.assertEqual(self.validator.validate_widget(w, "w", period).warnings, [])
+        elsewhere = [{"id": "p", "type": "date_range", "label": "P", "applies_to": {"sale.order": "date_order"}}]
+        self.assertEqual([x.code for x in self.validator.validate_widget(w, "w", elsewhere).warnings], ["COMPARE_NO_PERIOD"])
+
+    # -- the options a widget reads ---------------------------------------------------
+
+    def test_view_options_belong_to_the_widget_type(self):
+        self.assertEqual(self.codes(_type="area", dimensions=[{"field": "date"}], _view={"smooth": True, "stacked": True}), [])
+        self.assertEqual(self.codes(_type="area", dimensions=[{"field": "date"}], _view={"smoothe": True}), ["UNKNOWN_KEY"])
+        self.assertEqual(self.codes(_type="kpi", _view={"smooth": True}), ["UNKNOWN_KEY"])
+        self.assertEqual(self.codes(_type="bar", dimensions=[{"field": "product_id"}], _view={"orientation": "sideways"}), ["BAD_VIEW"])
+        self.assertEqual(self.codes(_type="bar", dimensions=[{"field": "product_id"}], _view={"stacked": "yes"}), ["BAD_VIEW"])
+        two = [{"id": "m1", "field": "price_subtotal", "agg": "sum"}, {"id": "m2", "field": "product_uom_qty", "agg": "sum"}]
+        self.assertEqual(self.codes(_type="combo", dimensions=[{"field": "product_id"}], measures=two, _view={"line": "m2"}), [])
+        self.assertEqual(self.codes(_type="combo", dimensions=[{"field": "product_id"}], measures=two, _view={"line": "m9"}), ["BAD_VIEW"])
+
+    def test_a_pie_shows_shares_of_a_whole(self):
+        pie = {"_type": "pie", "dimensions": [{"field": "product_id"}]}
+        self.assertEqual(self.codes(**pie), [])
+        self.assertEqual(self.codes(measures=[{"id": "m1", "agg": "count"}], **pie), [])
+        self.assertEqual(self.codes(measures=[{"id": "m1", "field": "price_unit", "agg": "avg"}], **pie), ["BAD_SHAPE"])
+        self.assertEqual(self.codes(measures=[{"id": "m1", "field": "partner_id", "agg": "count_distinct"}], **pie), ["BAD_SHAPE"])
+
+    def test_the_new_types_have_a_shape(self):
+        two_measures = [{"id": "m1", "field": "price_subtotal", "agg": "sum"}, {"id": "m2", "field": "product_uom_qty", "agg": "sum"}]
+        cat = [{"field": "product_id"}]
+        self.assertEqual(self.codes(_type="heatmap", dimensions=[{"field": "date", "granularity": "day_of_week"}, {"field": "date", "granularity": "hour_number"}]), [])
+        self.assertEqual(self.codes(_type="funnel", dimensions=cat), [])
+        self.assertEqual(self.codes(_type="treemap", dimensions=cat + [{"field": "partner_id"}]), [])
+        self.assertEqual(self.codes(_type="waterfall", dimensions=cat), [])
+        self.assertEqual(self.codes(_type="scatter", dimensions=cat, measures=two_measures), [])
+        self.assertEqual(self.codes(_type="combo", dimensions=cat, measures=two_measures), [])
+        self.assertEqual(self.codes(_type="scatter", dimensions=cat), ["BAD_SHAPE"])  # needs two measures
+        self.assertEqual(self.codes(_type="combo", dimensions=cat), ["BAD_SHAPE"])
+        self.assertEqual(self.codes(_type="funnel", dimensions=cat + [{"field": "partner_id"}]), ["BAD_SHAPE"])
+
+    # -- clicking ------------------------------------------------------------------------
+
+    def test_clicking_can_filter_the_other_widgets(self):
+        click = lambda **kw: self.validator.validate_widget(Widget.from_raw({  # noqa: E731
+            "id": "w1", "type": "bar", "data": {"source": "sale.report", "domain": [["state", "=", "sale"]], "dimensions": [{"field": "product_id"}],
+                                                "measures": [{"id": "m1", "agg": "count"}]},
+            "interact": {"on_click": dict({"action": "cross_filter"}, **kw)}}, "widgets[0]"), "widgets[0]").errors
+        self.assertEqual(click(), [])
+        self.assertEqual([e.code for e in click(model="sale.order")], ["BAD_SPEC"])  # a cross-filter has no model or columns
+
+    # -- dashboard filters -------------------------------------------------------------
+
+    def test_the_filters_of_a_spec_are_checked_with_it(self):
+        spec = sample_spec()
+        spec["filters"] = [{"id": "period", "type": "date_range", "label": "Period", "default": "last_30_days", "applies_to": {"sale.report": "date"}}]
+        self.assertEqual(self.validator.validate_spec(Spec.from_raw(spec)).errors, [])
+        spec["filters"][0]["applies_to"] = {"sale.report": "state"}
+        self.assertEqual([e.code for e in self.validator.validate_spec(Spec.from_raw(spec)).errors], ["BAD_FILTER"])
 
     # -- warnings ------------------------------------------------------------------
 

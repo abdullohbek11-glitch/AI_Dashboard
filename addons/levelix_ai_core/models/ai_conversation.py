@@ -11,8 +11,9 @@ from odoo.exceptions import AccessError, UserError
 
 STALE_AFTER = timedelta(minutes=4)
 MAX_QUESTION = 8000
+MAX_NOTE = 500
 MAX_MENTIONS = 5
-CONTEXT_KEYS = ("model", "res_id", "view_type", "title", "mentions", "choice")
+CONTEXT_KEYS = ("model", "res_id", "view_type", "title", "mentions", "choice", "pin")
 CHOICE_TEXT = "I chose the record named in mentioned_records."
 
 
@@ -26,6 +27,8 @@ class LevelixAiConversation(models.Model):
     company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, index=True)
     message_ids = fields.One2many("levelix.ai.message", "conversation_id")
     active = fields.Boolean(default=True)
+    pin_model = fields.Char(help="The kind of record this whole chat is about (set when the chat is opened from that record).")
+    pin_id = fields.Integer(index=True)
 
     # -- what the chat page calls -------------------------------------------------------------------------
 
@@ -57,6 +60,9 @@ class LevelixAiConversation(models.Model):
                 clean[key] = value[:80]
             elif key == "res_id" and isinstance(value, int) and not isinstance(value, bool):
                 clean[key] = value
+            elif key == "pin" and isinstance(value, dict):
+                if isinstance(value.get("model"), str) and isinstance(value.get("id"), int) and not isinstance(value["id"], bool):
+                    clean[key] = {"model": value["model"][:80], "id": value["id"]}
             elif key == "choice" and value is True:  # a button the assistant offered was pressed
                 clean[key] = True
             elif key == "mentions" and isinstance(value, list):
@@ -81,19 +87,24 @@ class LevelixAiConversation(models.Model):
             raise UserError(self.env._("Unknown conversation."))
         if conversation:
             conversation.check_access("write")
+            pin = self._clean_context(context).get("pin")
+            if pin and not conversation.pin_model:  # an older chat that is now being continued about this record
+                conversation.write({"pin_model": pin["model"], "pin_id": pin["id"]})
             if conversation.message_ids.filtered(lambda m: m.state == "streaming" and not m._is_stale()):
                 raise UserError(self.env._("Wait for the current answer to finish."))
         else:
-            conversation = self.create({"name": text[:60]})
+            pin = self._clean_context(context).get("pin") or {}
+            conversation = self.create({"name": text[:60], "pin_model": pin.get("model"), "pin_id": pin.get("id")})
         Message = self.env["levelix.ai.message"].sudo()  # bookkeeping rows; the conversation was checked above
         context = self._clean_context(context)
         # In structure-only mode a pressed choice button must not carry the record's name to the vendor as text:
         # the screen shows the name, the vendor gets the id in the context line.
         said = CHOICE_TEXT if context.get("choice") and context.get("mentions") and engine._privacy() == "schema" else text
+        prepared = engine._prepared(said, conversation)  # looked up by the system now, instead of by the model in later steps
         question = Message.create({
             "conversation_id": conversation.id, "role": "user", "text": text,
             "llm_content": [{"role": "user", "content": [
-                {"type": "text", "text": f"{engine._context_line(context)}\n\n{said}"},
+                {"type": "text", "text": f"{engine._context_line(context)}\n\n{said}" + (f"\n\n{prepared}" if prepared else "")},
             ]}],
         })
         answer = Message.create({"conversation_id": conversation.id, "role": "assistant", "state": "streaming"})
@@ -104,16 +115,73 @@ class LevelixAiConversation(models.Model):
             "messages": [question._lx_payload(), answer._lx_payload()],
         }
 
+    def _lx_pin(self):
+        """The record this chat is about, with its name, if the reader may still see it."""
+        self.ensure_one()
+        if not self.pin_model or not self.pin_id:
+            return False
+        try:
+            record = self.env["levelix.ai.tools"]._model(self.pin_model).browse(self.pin_id).exists()
+            if not record:
+                return False
+            record.check_access("read")
+            return {"model": self.pin_model, "id": self.pin_id, "label": record.display_name or ""}
+        except (AccessError, UserError):
+            return False
+
+    @api.model
+    def _pinned_extra(self, model, res_id):
+        """Other chats that belong to a record (for example the chat that created it). Extensions add them."""
+        return self.browse()
+
+    @api.model
+    def lx_pinned(self, model, res_id):
+        """The reader's chats about one record, newest first (at most 5): the ones opened from it and the ones that made it."""
+        if not isinstance(model, str) or isinstance(res_id, bool) or not isinstance(res_id, int):
+            return []
+        rows = self.search([("user_id", "=", self.env.uid), ("pin_model", "=", model), ("pin_id", "=", res_id)], limit=5)
+        extra = self._pinned_extra(model, res_id).sudo().filtered(lambda c: c.user_id == self.env.user and c.active).sudo(False)
+        return [{"id": c.id, "name": c.name, "made_it": c in extra} for c in (extra | rows)[:5]]
+
     def lx_load(self):
         self.ensure_one()
         return {
-            "conversation": {"id": self.id, "name": self.name},
+            "conversation": {"id": self.id, "name": self.name, "pin": self._lx_pin()},
             "messages": [m._lx_payload() for m in self.message_ids.sorted("id")],
         }
 
     def lx_archive(self):
         self.write({"active": False})
         return True
+
+    @api.model
+    def lx_feedback(self, message_id, note=None):
+        """The user marks an answer as wrong. Kept with the question, the answer and what the assistant did,
+        so it can become a test case of the golden set. Marking twice only updates the note."""
+        if isinstance(message_id, bool) or not isinstance(message_id, int):
+            raise UserError(self.env._("Unknown answer."))
+        if note is not None and (not isinstance(note, str) or len(note) > MAX_NOTE):
+            raise UserError(self.env._("The note must be text of up to %s characters.", MAX_NOTE))
+        message = self.env["levelix.ai.message"].browse(message_id).exists()
+        message.check_access("read")  # own conversations only (record rule)
+        if message.role != "assistant" or message.state == "streaming":
+            raise UserError(self.env._("Only a finished answer can be marked."))
+        question = self.env["levelix.ai.message"].search(
+            [("conversation_id", "=", message.conversation_id.id), ("id", "<", message.id), ("role", "=", "user")], order="id desc", limit=1)
+        Feedback = self.env["levelix.ai.feedback"].sudo()  # bookkeeping row, the message was checked above
+        values = {
+            "note": (note or "").strip() or False,
+            "question": question.text, "answer": message.text, "error": message.error,
+            "privacy": self.env["levelix.ai.engine"]._privacy(),
+            "calls": [{"name": c.name, "arguments": c.arguments, "is_error": c.is_error, "error": c.error} for c in message.tool_call_ids.sorted("id")],
+            "block_types": [b.get("type") for b in message.blocks or []],
+        }
+        existing = Feedback.search([("message_id", "=", message.id)], limit=1)
+        if existing:
+            existing.write({"note": values["note"]})
+        else:
+            Feedback.create(dict(values, message_id=message.id))
+        return {"saved": True}
 
 
 class LevelixAiMessage(models.Model):
@@ -155,6 +223,7 @@ class LevelixAiMessage(models.Model):
             "blocks": self.blocks or [],
             "explain": self.explain or [],
             "error": self.env._("The answer was interrupted. Ask again.") if stale else (self.error or ""),
+            "marked": bool(self.env["levelix.ai.feedback"].search_count([("message_id", "=", self.id)])),
         }
 
 
@@ -177,3 +246,24 @@ class LevelixAiToolCall(models.Model):
     error = fields.Char()
     duration_ms = fields.Integer()
     privacy = fields.Char(help="Privacy mode in force when the tool ran: what the model was allowed to see.")
+
+
+class LevelixAiFeedback(models.Model):
+    """"This answer is wrong": the evidence a person gave, kept for the golden set. Written by the server only."""
+
+    _name = "levelix.ai.feedback"
+    _description = "Levelix AI Feedback"
+    _order = "id desc"
+
+    message_id = fields.Many2one("levelix.ai.message", required=True, index=True, ondelete="cascade")
+    user_id = fields.Many2one(related="message_id.user_id", store=True, index=True)
+    company_id = fields.Many2one(related="message_id.company_id", store=True)
+    verdict = fields.Selection([("wrong", "Wrong")], default="wrong", required=True)
+    note = fields.Char()
+    question = fields.Text()
+    answer = fields.Text()
+    error = fields.Char()
+    privacy = fields.Char()
+    calls = fields.Json(help="What the assistant did: tool, arguments, failure.")
+    block_types = fields.Json()
+    golden = fields.Boolean(string="In the golden set", help="Ticked by a person once the case was added to golden/.")

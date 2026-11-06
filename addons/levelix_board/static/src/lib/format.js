@@ -92,6 +92,36 @@ export function formatDateLabel(value, granularity, lang = "en") {
     return new Intl.DateTimeFormat(intlLocale(lang), options).format(moment);
 }
 
+export const DATE_PARTS = [
+    "year_number", "quarter_number", "month_number", "iso_week_number", "day_of_year",
+    "day_of_month", "day_of_week", "hour_number", "minute_number", "second_number",
+];
+
+/**
+ * A numeric date part as a reader says it. Odoo counts the weekday from Sunday (0) to Saturday (6); months from 1.
+ * Anything that is not a number (e.g. "Not set") passes through.
+ */
+export function formatPart(value, granularity, lang = "en") {
+    const number = Number(value);
+    if (value === null || value === undefined || value === "" || Number.isNaN(number)) {
+        return String(value);
+    }
+    const locale = intlLocale(lang);
+    if (granularity === "day_of_week") {
+        return new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2021, 0, 3 + number))); // 3 Jan 2021 was a Sunday
+    }
+    if (granularity === "month_number") {
+        return new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2021, number - 1, 1)));
+    }
+    if (granularity === "hour_number") {
+        return `${String(number).padStart(2, "0")}:00`;
+    }
+    if (granularity === "quarter_number") {
+        return `Q${number}`;
+    }
+    return String(number);
+}
+
 const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
 export function escapeHtml(text) {

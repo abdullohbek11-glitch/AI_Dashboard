@@ -79,3 +79,20 @@ class TestExplain(BaseCase):
     def test_mixed_currency(self):
         lines = explain(currency={"mixed": True})
         self.assertIn("Measured: Revenue (total), in several currencies.", texts(lines))
+
+
+@tagged("levelix_board")
+class TestExplainFeatures(BaseCase):
+    def test_a_comparison_is_explained(self):
+        lines = explain(lambda d: d.update(domain=[["state", "=", "sale"], ["date", ">=", "2026-11-01"], ["date", "<=", "2026-11-30"]],
+                                           compare="previous_period", fill_gaps=True))
+        self.assertIn("Compared with the previous period (2026-10-01 – 2026-10-31).", texts(lines, detail=False))
+        lines = explain(lambda d: d.update(domain=[["state", "=", "sale"], ["date", ">=", "2026-11-01"], ["date", "<=", "2026-11-30"]],
+                                           compare="previous_year", fill_gaps=True))
+        self.assertIn("Compared with the previous year (2025-11-01 – 2025-11-30).", texts(lines, detail=False))
+
+    def test_a_calculated_measure_is_explained_without_formulas_of_ids(self):
+        lines = explain(lambda d: d.update(measures=[{"id": "m1", "field": "price_subtotal", "agg": "sum", "label": "Revenue"},
+                                                     {"id": "m2", "field": "product_uom_qty", "agg": "sum", "label": "Qty"},
+                                                     {"id": "m3", "calc": "m1 / m2", "label": "Price per unit"}], limit=None, others=False), index=1)
+        self.assertIn("Measured: Price per unit (calculated from the other measures).", texts(lines))

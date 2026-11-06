@@ -2,12 +2,14 @@
 import { loadBundle, loadJS } from "@web/core/assets";
 import { registry } from "@web/core/registry";
 import { buildChartJs, buildECharts } from "../lib/chart_options.js";
+import { MORE_KINDS } from "../lib/chart_options_more.js";
 
 /**
  * What every chart library adapter provides. Widgets know only this interface.
  *   mount(el, spec)   draw into `el`;  spec = { kind, model, theme, fmt, view, animate }
  *   update(spec)      redraw with new data or theme
- *   onPointClick(cb)  cb({ seriesIndex, pointIndex }) when a point (or its column) is clicked
+ *   onPointClick(cb)  cb({ seriesIndex, pointIndex }) when a point (or its column) is clicked, or cb({ rowIndex }) when the
+ *                     chart knows the frame row itself (heat map cells, funnel stages ...)
  *   resize(), dispose()
  */
 export class ChartAdapter {
@@ -32,9 +34,10 @@ export class ChartJsAdapter extends ChartAdapter {
         this.chart?.destroy();
         const config = buildChartJs(spec);
         const axis = config.options.indexAxis === "y" ? "y" : "x";
+        const slices = config.type === "pie" || config.type === "doughnut";
         config.options.onClick = (event, _elements, chart) => {
-            // the nearest point of the clicked column, even when the pointer is not exactly on it
-            const hits = chart.getElementsAtEventForMode(event, "nearest", { intersect: false, axis }, false);
+            // the nearest point of the clicked column, even when the pointer is not exactly on it; a slice must be hit itself
+            const hits = chart.getElementsAtEventForMode(event, "nearest", { intersect: slices, axis }, false);
             if (hits.length && this.clickCallback) {
                 this.clickCallback({ seriesIndex: hits[0].datasetIndex, pointIndex: hits[0].index });
             }
@@ -61,7 +64,17 @@ export class EChartsAdapter extends ChartAdapter {
     async mount(el, spec) {
         await loadJS("/levelix_board/static/lib/echarts/echarts.min.js");
         this.chart = window.echarts.init(el, null, { renderer: "canvas" });
-        this.chart.getZr().on("click", (event) => this.handleClick(event));
+        this.byDatum = MORE_KINDS.includes(spec.kind);
+        if (this.byDatum) { // every datum of these types carries its frame row
+            this.chart.on("click", (event) => {
+                const rowIndex = event.data && event.data.rowIndex;
+                if (this.clickCallback && rowIndex !== undefined && rowIndex !== null) {
+                    this.clickCallback({ rowIndex });
+                }
+            });
+        } else {
+            this.chart.getZr().on("click", (event) => this.handleClick(event));
+        }
         this.update(spec);
     }
 

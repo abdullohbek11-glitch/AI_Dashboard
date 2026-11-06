@@ -19,6 +19,7 @@
             <div t-if="props.block.total > props.block.rows.length" class="lxai-note">
                 Showing <t t-esc="props.block.rows.length"/> of <t t-esc="props.block.total"/>
             </div>
+            <div t-if="props.block.scope" class="lxai-note" t-esc="props.block.scope"/>
             <div t-foreach="props.block.warnings or []" t-as="warning" t-key="warning_index" class="lxai-note lxai-note--warn" t-esc="warning"/>
         </div>
     </t>
@@ -35,6 +36,7 @@
                     <div class="lxai-kpi__label" t-esc="item.label"/>
                 </div>
             </div>
+            <div t-if="props.block.scope" class="lxai-note" t-esc="props.block.scope"/>
             <div t-foreach="props.block.warnings or []" t-as="warning" t-key="warning_index" class="lxai-note lxai-note--warn" t-esc="warning"/>
         </div>
     </t>
@@ -46,6 +48,7 @@
                 <button t-if="props.block.spec and props.onOpen" class="lxai-link" t-on-click="() => props.onOpen(props.block.spec, props.block.title)">Open in Odoo</button>
             </div>
             <div class="lxai-chart"><canvas t-ref="canvas"/></div>
+            <div t-if="props.block.scope" class="lxai-note" t-esc="props.block.scope"/>
         </div>
     </t>
 

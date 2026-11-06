@@ -5,13 +5,14 @@ names, local ISO dates); the frontend only formats and draws, it never computes.
 Empty days/months are filled here (Odoo's own ``fill_temporal`` fails with time
 zones and cannot be combined with a limit).
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
+from typing import Optional
 
-from . import filters
+from . import calc, filters
 from .errors import BoardWarning
 from .i18n import t
-from .planner import DimMeta, Plan
+from .planner import PIE_KEEP, PIE_MAX_SLICES, DimMeta, Plan
 
 NOT_SET = "Not set"
 OTHERS = "Others"
@@ -25,13 +26,17 @@ class Frame:
     columns: list
     rows: list
     meta: dict
+    compare_rows: Optional[list] = None
 
     def to_dict(self) -> dict:
-        return {"columns": self.columns, "rows": self.rows, "meta": self.meta}
+        out = {"columns": self.columns, "rows": self.rows, "meta": self.meta}
+        if self.compare_rows is not None:
+            out["compare_rows"] = self.compare_rows
+        return out
 
 
 class FrameBuilder:
-    def build(self, plan: Plan, groups: list, total=None, currency=None, warnings=()) -> Frame:
+    def build(self, plan: Plan, groups: list, total=None, currency=None, warnings=(), compare_groups=None) -> Frame:
         warnings = list(warnings)
         truncated = False
         if plan.top_n is None and len(groups) > plan.cap:
@@ -48,6 +53,10 @@ class FrameBuilder:
 
         if plan.fill is not None:
             rows, refs = self._fill(plan, rows, refs)
+        self._apply_calc(plan, rows)
+        if plan.auto_others and total is not None and len(rows) > PIE_MAX_SLICES:
+            rows, refs = self._biggest(plan, rows, refs)
+            plan = replace(plan, others=True)
         if plan.others and total is not None:
             extra = self._others_row(plan, rows, total)
             if extra:
@@ -62,7 +71,37 @@ class FrameBuilder:
             "warnings": [w.to_dict() for w in warnings],
             "group_refs": refs,
         }
-        return Frame(self._columns(plan), rows, meta)
+        compare_rows = None
+        if plan.compare is not None and compare_groups is not None:
+            earlier = replace(plan, domain=plan.compare.domain, fill=plan.compare.fill, others=False, totals=False,
+                              auto_others=False, compare=None, compare_skipped=None)
+            compare_rows = self.build(earlier, compare_groups, None, currency).rows
+            meta["compare"] = {"kind": plan.compare.kind, "from": plan.compare.start.isoformat(),
+                               "to": (plan.compare.end_excl - timedelta(days=1)).isoformat()}
+        return Frame(self._columns(plan), rows, meta, compare_rows)
+
+    # -- calculated measures and pies -------------------------------------------------
+
+    @staticmethod
+    def _apply_calc(plan: Plan, rows: list):
+        """Fill the cells of calculated measures from the other measures of the same row."""
+        calcs = [(i, m) for i, m in enumerate(plan.measures) if m.is_calc]
+        if not calcs:
+            return
+        offset = len(plan.dims)
+        ids = [m.id for m in plan.measures]
+        for row in rows:
+            values = {mid: row[offset + i] for i, mid in enumerate(ids)}
+            for i, measure in calcs:
+                row[offset + i] = calc.evaluate(measure.formula, values)
+
+    @staticmethod
+    def _biggest(plan: Plan, rows: list, refs: list):
+        """A pie keeps its biggest slices; the rest becomes "Others" (added by the caller from the grand total)."""
+        offset = len(plan.dims)
+        first = next(i for i, m in enumerate(plan.measures) if not m.is_calc)
+        order = sorted(range(len(rows)), key=lambda i: -(rows[i][offset + first] or 0))[:PIE_KEEP]
+        return [rows[i] for i in order], [refs[i] for i in order]
 
     # -- columns / cells ----------------------------------------------------
 
@@ -172,6 +211,11 @@ class FrameBuilder:
             if measure.additive:
                 value = total.get(measure.key) or 0
                 out[measure.id] = round(value) if measure.agg == "count" else value
+        for measure in plan.measures:  # a calculated measure is totalled only from totals that exist
+            if measure.is_calc and calc.names(measure.formula) <= set(out):
+                value = calc.evaluate(measure.formula, out)
+                if value is not None:
+                    out[measure.id] = value
         return out
 
     # -- others -------------------------------------------------------------
@@ -181,11 +225,18 @@ class FrameBuilder:
         offset = len(plan.dims)
         rest = []
         for index, measure in enumerate(plan.measures):
+            if measure.is_calc:
+                rest.append(None)
+                continue
             top = sum((row[offset + index] or 0) for row in rows)
             value = (total.get(measure.key) or 0) - top
             rest.append(round(value) if measure.agg == "count" else value)
-        if all(abs(v) < _EPSILON for v in rest):
+        if all(abs(v) < _EPSILON for v in rest if v is not None):
             return None
+        values = {m.id: rest[i] for i, m in enumerate(plan.measures)}
+        for index, measure in enumerate(plan.measures):
+            if measure.is_calc:
+                rest[index] = calc.evaluate(measure.formula, values)
         return [t(OTHERS)] + rest
 
 

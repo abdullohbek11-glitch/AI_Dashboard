@@ -47,6 +47,10 @@
                             <field name="lx_ai_timeout"/>
                             <label for="lx_ai_temperature" class="o_form_label"/>
                             <field name="lx_ai_temperature" placeholder="Vendor default"/>
+                            <div class="mt-3">
+                                <label for="lx_ai_reasoning" class="o_form_label"/>
+                                <field name="lx_ai_reasoning"/>
+                            </div>
                         </setting>
                     </block>
                     <block title="Privacy" name="lx_ai_privacy_container">

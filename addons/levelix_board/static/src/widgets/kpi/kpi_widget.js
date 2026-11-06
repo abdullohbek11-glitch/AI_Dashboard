@@ -1,6 +1,7 @@
 /** @odoo-module **/
 import { Component, onWillUnmount, useEffect, useRef, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
+import { _t } from "@web/core/l10n/translation";
 import { user } from "@web/core/user";
 import { useService } from "@web/core/utils/hooks";
 import { formatFull, formatNumber } from "../../lib/format.js";
@@ -39,6 +40,17 @@ export class KpiWidget extends Component {
                 deltaText: card.delta ? this.deltaText(card.delta) : null,
             };
         });
+    }
+
+    /** What the arrow compares with ("vs previous period") and the days it stands for, for the tooltip. */
+    get compareCaption() {
+        const compare = this.props.frame.meta.compare;
+        return compare ? (compare.kind === "previous_year" ? _t("vs previous year") : _t("vs previous period")) : "";
+    }
+
+    get compareTitle() {
+        const compare = this.props.frame.meta.compare;
+        return compare ? `${compare.from} – ${compare.to}` : "";
     }
 
     /** A single card whose label repeats the widget title needs no label of its own. */

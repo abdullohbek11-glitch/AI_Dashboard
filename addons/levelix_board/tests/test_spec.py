@@ -88,3 +88,13 @@ class TestSpec(BaseCase):
     def test_size(self):
         spec = Spec.from_raw(sample_spec())
         self.assertLess(spec.size_bytes(), MAX_SPEC_BYTES)
+
+
+@tagged("levelix_board")
+class TestDimensionSpelling(BaseCase):
+    def test_a_dimension_written_the_way_the_chat_writes_it_is_the_same_dimension(self):
+        from ..lib.spec import Dimension
+        for raw in ("date:day_of_week", {"field": "date:day_of_week"}, {"field": "date", "granularity": "day_of_week"}):
+            self.assertEqual(Dimension.from_raw(raw, "d"), Dimension("date", "day_of_week"), raw)
+        self.assertEqual(Dimension.from_raw({"field": "partner_id.country_id"}, "d"), Dimension("partner_id.country_id", None))
+        self.assertEqual(Dimension.from_raw({"field": "date:month", "granularity": "day"}, "d").granularity, "day")  # an explicit granularity wins
